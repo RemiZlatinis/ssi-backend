@@ -20,6 +20,28 @@ runserver = "manage:main runserver"
 migrate = "manage:main migrate"
 makemigrations = "manage:main makemigrations"
 
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+ruff = "^0.13.0"
+django-debug-toolbar = "^6.0.0"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.ruff]
+# Set the same line length as Black to ensure they agree.
+line-length = 88
+
+[tool.ruff.lint]
+# Enable a good set of default rules, plus Django-specific ones.
+select = [
+    "E",  # pycodestyle errors
+    "F",  # Pyflakes
+    "W",  # pycodestyle warnings
+    "I",  # isort (import sorting)
+    "DJ", # django-specific rules
+]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
