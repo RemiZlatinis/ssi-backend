@@ -32,3 +32,6 @@ media/
 # IDE / Editor specific
 .vscode/
 .idea/
+
+# Ruff
+.ruff_cache
