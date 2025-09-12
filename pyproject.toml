@@ -24,6 +24,7 @@ makemigrations = "manage:main makemigrations"
 black = "^25.1.0"
 ruff = "^0.13.0"
 django-debug-toolbar = "^6.0.0"
+pre-commit = "^3.8.0"
 
 [tool.black]
 line-length = 88
