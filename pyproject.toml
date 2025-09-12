@@ -15,11 +15,6 @@ dependencies = [
 package-mode = false
 packages = [{include = "project"}]
 
-[tool.poetry.scripts]
-runserver = "manage:main runserver"
-migrate = "manage:main migrate"
-makemigrations = "manage:main makemigrations"
-
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 ruff = "^0.13.0"
