@@ -2,6 +2,7 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 User = get_user_model()
 
@@ -27,3 +28,45 @@ class Agent(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Service(models.Model):
+    """
+    Represents a single service monitored by an agent.
+    """
+
+    class Status(models.TextChoices):
+        OK = "OK", _("OK")
+        WARNING = "WARNING", _("Warning")
+        ERROR = "ERROR", _("Error")
+        UPDATE = "UPDATE", _("Update")
+        FAILURE = "FAILURE", _("Failure")
+        UNKNOWN = "UNKNOWN", _("Unknown")
+
+    # Static Information
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="services")
+    agent_service_id = models.CharField(
+        max_length=255,
+        help_text="The local, non-unique ID of the service on the agent machine.",
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    version = models.CharField(max_length=50, blank=True)
+    schedule = models.CharField(max_length=255, blank=True)
+
+    # Dynamic State (Last Known Update)
+    last_status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.UNKNOWN, blank=True
+    )
+    last_message = models.TextField(blank=True)
+    last_seen = models.DateTimeField(
+        null=True, blank=True, help_text="Timestamp of the last status update."
+    )
+
+    class Meta:
+        # Ensures that for any given agent, the local service ID is unique.
+        unique_together = ("agent", "agent_service_id")
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} on {self.agent.name}"
