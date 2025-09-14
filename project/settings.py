@@ -42,6 +42,8 @@ if host_env:
 # Application definition
 
 INSTALLED_APPS = [
+    # Priority apps
+    "daphne",
     # Default Django apps
     "django.contrib.admin",
     "django.contrib.auth",
@@ -51,6 +53,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third party
     "rest_framework",
+    "channels",
     # Project
     "core",
 ]
@@ -83,6 +86,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "project.wsgi.application"
+ASGI_APPLICATION = "project.asgi.application"
 
 
 # Database
@@ -93,6 +97,17 @@ DATABASES = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
+}
+
+
+# Channel layer configuration for development.
+# The in-memory layer is suitable for local testing and development.
+# For production, this should be replaced with a more robust backend
+# like 'channels-redis'.
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
 }
 
 
