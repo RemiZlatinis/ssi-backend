@@ -4,7 +4,7 @@ import json
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from django.http import StreamingHttpResponse
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +12,28 @@ from rest_framework.views import APIView
 from .authentication import AgentAuthentication, get_client_ip
 from .models import Agent
 from .serializers import AgentRegisterSerializer, AgentSerializer
+
+
+class AgentViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    A read-only ViewSet that provides `list` and `retrieve` actions
+    for agents, including their nested services.
+    """
+
+    serializer_class = AgentSerializer
+    permission_classes = [IsAuthenticated]
+
+    # Do you want a headache? Remove the # type ignore
+    def get_queryset(self):  # type: ignore
+        """
+        This view should return a list of all the agents
+        for the currently authenticated user.
+        It uses prefetch_related to optimize the query for services.
+        """
+        user = self.request.user
+        if user.is_authenticated:
+            return Agent.objects.filter(owner=user).prefetch_related("services")
+        return Agent.objects.none()
 
 
 class AgentRegisterView(APIView):
