@@ -1,3 +1,9 @@
+import asyncio
+import json
+
+from channels.db import database_sync_to_async
+from channels.layers import get_channel_layer
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -84,3 +90,65 @@ class AgentMeView(APIView):
         agent = request.auth
         serializer = AgentSerializer(agent)
         return Response(serializer.data)
+
+
+async def sse_agent_status(request):
+    """
+    A view that streams agent connection status updates using Server-Sent Events.
+    """
+
+    async def event_stream():
+        # Create a unique channel for this client to listen on
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+
+        channel_name = await channel_layer.new_channel()
+        await channel_layer.group_add("agent_status", channel_name)
+
+        try:
+            # Send the initial list of all agents and their current status
+            initial_statuses = await get_all_agent_statuses()
+            yield f"data: {json.dumps(initial_statuses)}\n\n".encode("utf-8")
+
+            # Listen for messages from the group
+            while True:
+                message = await channel_layer.receive(channel_name)
+                if message["type"] == "agent.status.update":
+                    data = {
+                        "agent_id": message["agent_id"],
+                        "agent_name": message["agent_name"],
+                        "status": message["status"],
+                    }
+                    # SSE format: "data: <json_string>\n\n"
+                    yield f"data: {json.dumps(data)}\n\n".encode("utf-8")
+                # A small sleep to prevent a tight loop if the connection breaks
+                await asyncio.sleep(0.1)
+        finally:
+            # Clean up when the client disconnects
+            if channel_layer:
+                await channel_layer.group_discard("agent_status", channel_name)
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    return response
+
+
+@database_sync_to_async
+def get_all_agent_statuses():
+    """
+    Fetches all agents and determines their current connection status.
+    NOTE: This is a simplified status check. For a real-world scenario,
+    you would have a more robust presence tracking system (e.g., using Redis).
+    """
+    # This is a simplification. In-memory layer doesn't expose connections.
+    # We will assume all agents are disconnected initially and rely on live updates.
+    # With Redis, you could query presence more effectively.
+    agents = Agent.objects.filter(
+        registration_status=Agent.RegistrationStatus.REGISTERED
+    )
+    statuses = [
+        {"agent_id": str(agent.pk), "agent_name": agent.name, "status": "disconnected"}
+        for agent in agents
+    ]
+    return statuses

@@ -11,6 +11,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
     WebSocket consumer that handles connections from agents.
     """
 
+    GROUP_NAME = "agent_status"
+
     async def connect(self):
         """
         Handles a new WebSocket connection.
@@ -24,6 +26,18 @@ class AgentConsumer(AsyncWebsocketConsumer):
         else:
             print(f"Agent '{self.agent.name}' connected successfully.")
             await self.accept()
+            # Add agent to the group
+            await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)  # type: ignore
+            # Broadcast that this agent is now connected
+            await self.channel_layer.group_send(  # type: ignore
+                self.GROUP_NAME,
+                {
+                    "type": "agent.status.update",
+                    "agent_id": str(self.agent.id),
+                    "agent_name": self.agent.name,
+                    "status": "connected",
+                },
+            )
 
     async def disconnect(self, code):
         """
@@ -31,8 +45,28 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """
         if hasattr(self, "agent") and self.agent:
             print(f"Agent '{self.agent.name}' disconnected.")
+            # Broadcast that this agent has disconnected
+            await self.channel_layer.group_send(  # type: ignore
+                self.GROUP_NAME,
+                {
+                    "type": "agent.status.update",
+                    "agent_id": str(self.agent.id),
+                    "agent_name": self.agent.name,
+                    "status": "disconnected",
+                },
+            )
+            # Remove agent from the group
+            await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)  # type: ignore
         else:
             print("An unauthenticated agent disconnected.")
+
+    async def agent_status_update(self, event):
+        """
+        Handler for status update messages. This consumer broadcasts the updates
+        but does not need to process them itself. This method is here to
+        prevent a "No handler" error when the consumer receives its own message.
+        """
+        pass
 
     async def receive(self, text_data=None, bytes_data=None):
         """
