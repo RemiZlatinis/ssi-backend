@@ -4,6 +4,16 @@ from rest_framework.exceptions import AuthenticationFailed
 from .models import Agent
 
 
+def get_client_ip(request):
+    """Get the client's real IP address from the request."""
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(",")[0]
+    else:
+        ip = request.META.get("REMOTE_ADDR")
+    return ip
+
+
 class AgentAuthentication(BaseAuthentication):
     """
     Custom authentication class for Agents.
@@ -21,12 +31,17 @@ class AgentAuthentication(BaseAuthentication):
             return None
 
         try:
-            # The header is "Agent <key>", so we split and take the second part
             agent_key = auth_header.split(" ")[1]
-            agent = Agent.objects.select_related("owner").get(key=agent_key)
+            agent = Agent.objects.select_related("owner").get(
+                key=agent_key, registration_status=Agent.RegistrationStatus.REGISTERED
+            )
         except (IndexError, Agent.DoesNotExist):
-            raise AuthenticationFailed("Invalid agent key.")
+            raise AuthenticationFailed("Invalid or not registered agent key.")
 
-        # The authenticate method must return a two-tuple of (user, auth)
-        # We'll set the agent's owner as the user and the agent instance as auth
+        # Update IP address on successful authentication
+        current_ip = get_client_ip(request)
+        if agent.ip_address != current_ip:
+            agent.ip_address = current_ip
+            agent.save(update_fields=["ip_address"])
+
         return (agent.owner, agent)

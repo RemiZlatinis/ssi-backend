@@ -17,5 +17,23 @@ class AgentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Agent
-        fields = ["id", "name", "key", "created_at", "owner"]
-        read_only_fields = ["key", "created_at", "owner"]
+        fields = [
+            "id",
+            "name",
+            # "key",
+            "created_at",
+            "owner",
+            "ip_address",
+            "registration_status",
+        ]
+        read_only_fields = [
+            # "key",
+            "created_at",
+            "owner",
+            "ip_address",
+            "registration_status",
+        ]
+
+
+class AgentRegisterSerializer(serializers.Serializer):
+    key = serializers.UUIDField()
