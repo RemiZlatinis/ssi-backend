@@ -50,13 +50,39 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.sites",
     "django.contrib.staticfiles",
     # Third party
     "rest_framework",
+    "rest_framework.authtoken",
     "channels",
+    "allauth",
+    "allauth.account",
+    "dj_rest_auth",
     # Project
     "core",
 ]
+
+SITE_ID = 1
+
+# allauth settings
+ACCOUNT_AUTHENTICATION_METHODS = {
+    "username",
+}
+ACCOUNT_EMAIL_VERIFICATION = "none"
+
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+}
+
+REST_AUTH = {
+    "USE_JWT": True,
+    "JWT_AUTH_REFRESH_COOKIE": None,
+}
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -66,7 +92,13 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
+
+AUTHENTICATION_BACKENDS = (
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+)
 
 ROOT_URLCONF = "project.urls"
 
