@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+from asgiref.sync import sync_to_async  # Import sync_to_async
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from django.http import StreamingHttpResponse
@@ -116,40 +117,109 @@ class AgentMeView(APIView):
 
 async def sse_agent_status(request):
     """
-    A view that streams agent connection status updates using Server-Sent Events.
+    A view that streams agent connection status and service updates
+    using Server-Sent Events.
     """
+    # Resolve request.user and its properties in an async-safe way
+    # request.user is a SimpleLazyObject that performs synchronous operations
+    # when its properties (like is_authenticated or id) are accessed.
+    # We need to ensure this resolution happens in a thread.
+    user = await sync_to_async(lambda: request.user)()
+    is_authenticated = await sync_to_async(lambda: user.is_authenticated)()
+
+    if not is_authenticated:
+        return StreamingHttpResponse(
+            [
+                (
+                    f"data: {json.dumps({'error': 'Authentication required'})}\n\n"
+                ).encode("utf-8")
+            ],
+            content_type="text/event-stream",
+            status=401,
+        )
+
+    # Dynamically define a group name based on the authenticated user's ID
+    user_id = await sync_to_async(lambda: user.id)()
+    USER_AGENT_STATUS_GROUP_NAME = f"user_{user_id}_agent_status_updates"
 
     async def event_stream():
-        # Create a unique channel for this client to listen on
         channel_layer = get_channel_layer()
         if not channel_layer:
+            # If channel layer is not configured (e.g., in-memory without run_asgi),
+            # we can't stream real-time updates.
+            yield (
+                f"data: {json.dumps({'error': 'Channel layer not configured'})}\n\n"
+            ).encode("utf-8")
             return
 
+        # Create a unique channel for this client to listen on
         channel_name = await channel_layer.new_channel()
-        await channel_layer.group_add("agent_status", channel_name)
+        await channel_layer.group_add(USER_AGENT_STATUS_GROUP_NAME, channel_name)
 
         try:
             # Send the initial list of all agents and their current status
-            initial_statuses = await get_all_agent_statuses()
-            yield f"data: {json.dumps(initial_statuses)}\n\n".encode("utf-8")
+            # get_all_agent_statuses is already @database_sync_to_async,
+            # so passing `user` is fine.
+            initial_statuses = await get_all_agent_statuses(user)
+            yield (
+                f"data: {json.dumps({'type': 'initial_status',
+                                     'agents': initial_statuses})}"
+                f"\n\n"
+            ).encode("utf-8")
 
             # Listen for messages from the group
             while True:
                 message = await channel_layer.receive(channel_name)
                 if message["type"] == "agent.status.update":
                     data = {
+                        "type": "agent_status_update",
                         "agent_id": message["agent_id"],
                         "agent_name": message["agent_name"],
-                        "status": message["status"],
+                        "is_online": message["is_online"],
                     }
-                    # SSE format: "data: <json_string>\n\n"
+                    yield f"data: {json.dumps(data)}\n\n".encode("utf-8")
+                elif message["type"] == "service.status.update":
+                    data = {
+                        "type": "service_status_update",
+                        "agent_id": message["agent_id"],
+                        "agent_name": message["agent_name"],
+                        "service_id": message["service_id"],
+                        "status": message["status"],
+                        "message": message["message"],
+                        "timestamp": message["timestamp"],
+                    }
+                    yield f"data: {json.dumps(data)}\n\n".encode("utf-8")
+                elif message["type"] == "service.removed":
+                    data = {
+                        "type": "service_removed",
+                        "agent_id": message["agent_id"],
+                        "agent_name": message["agent_name"],
+                        "service_id": message["service_id"],
+                    }
+                    yield f"data: {json.dumps(data)}\n\n".encode("utf-8")
+                elif message["type"] == "service.added":
+                    data = {
+                        "type": "service_added",
+                        "agent_id": message["agent_id"],
+                        "agent_name": message["agent_name"],
+                        "service_id": message["service_id"],
+                        "name": message["name"],
+                        "description": message["description"],
+                        "version": message["version"],
+                        "schedule": message["schedule"],
+                        "last_status": message["last_status"],
+                        "last_message": message["last_message"],
+                        "last_seen": message["last_seen"],
+                    }
                     yield f"data: {json.dumps(data)}\n\n".encode("utf-8")
                 # A small sleep to prevent a tight loop if the connection breaks
                 await asyncio.sleep(0.1)
         finally:
             # Clean up when the client disconnects
             if channel_layer:
-                await channel_layer.group_discard("agent_status", channel_name)
+                await channel_layer.group_discard(
+                    USER_AGENT_STATUS_GROUP_NAME, channel_name
+                )
 
     response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"
@@ -157,20 +227,39 @@ async def sse_agent_status(request):
 
 
 @database_sync_to_async
-def get_all_agent_statuses():
+def get_all_agent_statuses(user):
     """
-    Fetches all agents and determines their current connection status.
-    NOTE: This is a simplified status check. For a real-world scenario,
-    you would have a more robust presence tracking system (e.g., using Redis).
+    Fetches all registered agents for a given user and their current online status
+    from the database. Also fetches their services and their last known status.
     """
-    # This is a simplification. In-memory layer doesn't expose connections.
-    # We will assume all agents are disconnected initially and rely on live updates.
-    # With Redis, you could query presence more effectively.
     agents = Agent.objects.filter(
-        registration_status=Agent.RegistrationStatus.REGISTERED
-    )
-    statuses = [
-        {"agent_id": str(agent.pk), "agent_name": agent.name, "status": "disconnected"}
-        for agent in agents
-    ]
-    return statuses
+        owner=user, registration_status=Agent.RegistrationStatus.REGISTERED
+    ).prefetch_related("services")
+
+    all_data = []
+    for agent in agents:
+        agent_data = {
+            "agent_id": str(agent.pk),
+            "agent_name": agent.name,
+            "is_online": agent.is_online,  # Use the is_online field
+            "ip_address": agent.ip_address,
+            "registration_status": agent.registration_status,
+            "services": [],
+        }
+        for service in agent.services.all():  # type: ignore
+            agent_data["services"].append(
+                {
+                    "service_id": service.agent_service_id,
+                    "name": service.name,
+                    "description": service.description,
+                    "version": service.version,
+                    "schedule": service.schedule,
+                    "last_status": service.last_status,
+                    "last_message": service.last_message,
+                    "last_seen": (
+                        service.last_seen.isoformat() if service.last_seen else None
+                    ),
+                }
+            )
+        all_data.append(agent_data)
+    return all_data

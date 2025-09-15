@@ -2,6 +2,7 @@ import json
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.layers import get_channel_layer  # Import get_channel_layer
 
 from .models import Agent, Service
 
@@ -10,8 +11,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer that handles connections from agents.
     """
-
-    GROUP_NAME = "agent_status"
 
     async def connect(self):
         """
@@ -26,18 +25,22 @@ class AgentConsumer(AsyncWebsocketConsumer):
         else:
             print(f"Agent '{self.agent.name}' connected successfully.")
             await self.accept()
-            # Add agent to the group
-            await self.channel_layer.group_add(self.GROUP_NAME, self.channel_name)  # type: ignore
-            # Broadcast that this agent is now connected
-            await self.channel_layer.group_send(  # type: ignore
-                self.GROUP_NAME,
-                {
-                    "type": "agent.status.update",
-                    "agent_id": str(self.agent.id),
-                    "agent_name": self.agent.name,
-                    "status": "connected",
-                },
-            )
+            await self._set_agent_online_status(is_online=True)
+
+            # Dynamically define a group name based on the agent's owner
+            owner_id = await self._get_agent_owner_id(self.agent)
+            self.agent_owner_group_name = f"user_{owner_id}_agent_status_updates"
+
+            self.channel_layer = get_channel_layer()
+            # The AgentConsumer should only send messages, not receive from its
+            # own group.
+            # if self.channel_layer:
+            #     await self.channel_layer.group_add(
+            #         self.agent_owner_group_name,
+            #         self.channel_name
+            #     )
+            # Broadcast the initial online status to the user's group
+            await self._broadcast_agent_status(is_online=True)
 
     async def disconnect(self, code):
         """
@@ -45,28 +48,18 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """
         if hasattr(self, "agent") and self.agent:
             print(f"Agent '{self.agent.name}' disconnected.")
-            # Broadcast that this agent has disconnected
-            await self.channel_layer.group_send(  # type: ignore
-                self.GROUP_NAME,
-                {
-                    "type": "agent.status.update",
-                    "agent_id": str(self.agent.id),
-                    "agent_name": self.agent.name,
-                    "status": "disconnected",
-                },
-            )
-            # Remove agent from the group
-            await self.channel_layer.group_discard(self.GROUP_NAME, self.channel_name)  # type: ignore
+            await self._set_agent_online_status(is_online=False)
+            # The AgentConsumer should only send messages, not receive from its
+            # own group.
+            # if hasattr(self, "channel_layer") and self.channel_layer:
+            #     await self.channel_layer.group_discard(
+            #         self.agent_owner_group_name,
+            #         self.channel_name
+            #     )
+            # Broadcast the offline status to the user's group
+            await self._broadcast_agent_status(is_online=False)
         else:
             print("An unauthenticated agent disconnected.")
-
-    async def agent_status_update(self, event):
-        """
-        Handler for status update messages. This consumer broadcasts the updates
-        but does not need to process them itself. This method is here to
-        prevent a "No handler" error when the consumer receives its own message.
-        """
-        pass
 
     async def receive(self, text_data=None, bytes_data=None):
         """
@@ -88,6 +81,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 await self._handle_service_removed(data)
             elif event_type == "status_update":
                 await self._handle_status_update(data)
+                # After updating service status, broadcast an update to the user's group
+                await self._broadcast_service_status_update(data.get("update"))
             else:
                 print(f"Received unknown event type: {event_type}")
 
@@ -110,6 +105,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
         if service_info:
             print(f"Processing 'service_added' for {service_info.get('name')}")
             await self.add_or_update_service_db(self.agent, service_info)
+            # After adding/updating service, broadcast an update to the user's group
+            await self._broadcast_service_added(service_info)
 
     async def _handle_service_removed(self, event_data):
         """Removes a single service from the database."""
@@ -117,6 +114,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
         if service_id:
             print(f"Processing 'service_removed' for ID {service_id}")
             await self.remove_service_db(self.agent, service_id)
+            # After removing service, broadcast an update to the user's group
+            await self._broadcast_service_removed(service_id)
 
     async def _handle_status_update(self, event_data):
         """Updates the status of a single service."""
@@ -126,8 +125,82 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 f"Processing 'status_update' for service ID {update.get('service_id')}"
             )
             await self.update_service_status_db(self.agent, update)
+            # After updating service status, broadcast an update to the user's group
+            await self._broadcast_service_status_update(update)
+
+    # --- Broadcasting Methods ---
+
+    async def _broadcast_agent_status(self, is_online: bool):
+        """Sends an agent online/offline status update to the channel layer group."""
+        if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
+            await self.channel_layer.group_send(
+                self.agent_owner_group_name,
+                {
+                    "type": "agent.status.update",
+                    "agent_id": str(self.agent.pk),
+                    "agent_name": self.agent.name,
+                    "is_online": is_online,
+                },
+            )
+
+    async def _broadcast_service_status_update(self, update_data: dict):
+        """Sends a service status update to the channel layer group."""
+        if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
+            await self.channel_layer.group_send(
+                self.agent_owner_group_name,
+                {
+                    "type": "service.status.update",
+                    "agent_id": str(self.agent.pk),
+                    "agent_name": self.agent.name,
+                    "service_id": update_data.get("service_id"),
+                    "status": update_data.get("status"),
+                    "message": update_data.get("message"),
+                    "timestamp": update_data.get("timestamp"),
+                },
+            )
+
+    async def _broadcast_service_removed(self, service_id: str):
+        """Sends a service removed event to the channel layer group."""
+        if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
+            await self.channel_layer.group_send(
+                self.agent_owner_group_name,
+                {
+                    "type": "service.removed",
+                    "agent_id": str(self.agent.pk),
+                    "agent_name": self.agent.name,
+                    "service_id": service_id,
+                },
+            )
+
+    async def _broadcast_service_added(self, service_info: dict):
+        """Sends a service added/updated event to the channel layer group."""
+        if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
+            await self.channel_layer.group_send(
+                self.agent_owner_group_name,
+                {
+                    "type": "service.added",
+                    "agent_id": str(self.agent.pk),
+                    "agent_name": self.agent.name,
+                    "service_id": service_info.get("id"),
+                    "name": service_info.get("name"),
+                    "description": service_info.get("description"),
+                    "version": service_info.get("version"),
+                    "schedule": service_info.get("schedule"),
+                    # Initial status for a newly added service
+                    "last_status": None,
+                    "last_message": None,
+                    "last_seen": None,  # Will be updated on first status report
+                },
+            )
 
     # --- Database Operations (wrapped for async context) ---
+
+    @database_sync_to_async
+    def _set_agent_online_status(self, is_online: bool):
+        """Sets the agent's online status in the database."""
+        if self.agent:
+            self.agent.is_online = is_online
+            self.agent.save(update_fields=["is_online"])
 
     @database_sync_to_async
     def sync_services_db(self, agent, services_info):
@@ -183,8 +256,13 @@ class AgentConsumer(AsyncWebsocketConsumer):
         except Service.DoesNotExist:
             print(
                 f"Warning: Received status update for unknown service ID "
-                f"{update_data['service_id']} from agent {agent.name}"
+                f"{update_data.get('service_id')} from agent {agent.name}"
             )
+
+    @database_sync_to_async
+    def _get_agent_owner_id(self, agent):
+        """Asynchronously fetches the owner ID of an agent."""
+        return agent.owner.id
 
     @database_sync_to_async
     def get_agent(self, key):

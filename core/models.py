@@ -26,6 +26,16 @@ class Agent(models.Model):
         default=RegistrationStatus.PENDING,
     )
 
+    # Dynamic State
+    is_online = models.BooleanField(default=False)
+    # last_seen = models.DateTimeField(
+    #     null=True, blank=True,
+    #     help_text="Timestamp of the last update from the agent."
+    # )
+
+    class Meta:
+        ordering = ["name"]
+
     def __str__(self):
         return self.name
 
