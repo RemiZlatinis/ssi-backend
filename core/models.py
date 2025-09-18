@@ -104,7 +104,7 @@ class AgentRegistration(models.Model):
 
     def save(self, *args, **kwargs):
         if self._state.adding:  # On creation
-            self.expires_at = timezone.now() + timezone.timedelta(minutes=5)
+            self.expires_at = timezone.now() + timezone.timedelta(minutes=1)
             self.code = self.generate_unique_code()
         super().save(*args, **kwargs)
 
