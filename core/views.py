@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import Any, cast
 
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from django.http import StreamingHttpResponse
@@ -14,13 +14,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .authentication import AgentAuthentication, get_client_ip
+from .authentication import AgentAuthentication
 from .models import Agent, AgentRegistration
 from .serializers import (
     AgentRegisterSerializer,
     AgentRegistrationSerializer,
     AgentSerializer,
+    CompleteAgentRegistrationSerializer,
 )
+from .utils import get_client_ip
 
 
 class AgentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -57,17 +59,12 @@ class AgentRegisterView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
-        if validated_data is None or not isinstance(validated_data, dict):
+        if not isinstance(validated_data, dict):
             return Response(
                 {"detail": "Invalid data."}, status=status.HTTP_400_BAD_REQUEST
             )
 
-        key = validated_data.get("key")
-        if key is None:
-            return Response(
-                {"detail": "Key is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
+        key = validated_data["key"]
         try:
             agent = Agent.objects.get(key=key)
         except Agent.DoesNotExist:
@@ -94,7 +91,7 @@ class AgentRegisterView(APIView):
 
 class AgentUnregisterView(APIView):
     """
-    Marks an authenticated agent as 'unregistered'.
+    Marks an authenticated agent as 'unregistered' and deletes its services.
     """
 
     authentication_classes = [AgentAuthentication]
@@ -102,10 +99,30 @@ class AgentUnregisterView(APIView):
 
     def post(self, request, *args, **kwargs):
         agent = request.auth
+
+        # First, delete all associated services for a clean slate.
+        # This prevents orphaned service records.
+        agent.services.all().delete()
+
         agent.registration_status = Agent.RegistrationStatus.UNREGISTERED
-        agent.save()
+        agent.save(update_fields=["registration_status"])
+
+        # Get the channel layer and send a message to force disconnection
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            agent_group_name = f"agent_{agent.key}"
+            async_to_sync(channel_layer.group_send)(
+                agent_group_name,
+                {
+                    "type": "force.disconnect",
+                },
+            )
+
         return Response(
-            {"message": f"Agent '{agent.name}' has been unregistered."},
+            {
+                "message": f"Agent '{agent.name}' has been unregistered"
+                " and its services removed."
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -132,11 +149,20 @@ class CompleteAgentRegistrationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        code = request.data.get("code")
-        if not code:
+        serializer = CompleteAgentRegistrationSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        validated_data = serializer.validated_data
+        if not isinstance(validated_data, dict):
+            # This case should not be reached if validation is successful,
+            # but it acts as a type guard for static analysis.
             return Response(
-                {"detail": "Code is required."}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Invalid data format."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+        code = validated_data["code"]
+        name = validated_data["name"]
 
         try:
             registration = AgentRegistration.objects.get(
@@ -162,7 +188,7 @@ class CompleteAgentRegistrationView(APIView):
         # Create the agent for the user who initiated the registration
         agent = Agent.objects.create(
             owner=request.user,
-            name=f"New Agent via Code {registration.code}",
+            name=name,
             registration_status=Agent.RegistrationStatus.REGISTERED,
         )
 
@@ -277,6 +303,7 @@ async def sse_agent_status(request):
                         "agent_id": message["agent_id"],
                         "agent_name": message["agent_name"],
                         "is_online": message["is_online"],
+                        "ip_address": message.get("ip_address", None),
                     }
                     yield f"data: {json.dumps(data)}\n\n".encode("utf-8")
                 elif message["type"] == "service.status.update":

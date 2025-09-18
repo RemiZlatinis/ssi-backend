@@ -71,3 +71,14 @@ class AgentRegistrationSerializer(serializers.ModelSerializer):
         model = AgentRegistration
         fields = ["id", "code", "status", "expires_at"]
         read_only_fields = ["id", "status", "expires_at"]
+
+
+class CompleteAgentRegistrationSerializer(serializers.Serializer):
+    """
+    Serializer for completing agent registration with a code and a name.
+    """
+
+    code = serializers.CharField(max_length=6, min_length=6)
+    name = serializers.CharField(
+        max_length=50, help_text="A friendly name for the new agent."
+    )

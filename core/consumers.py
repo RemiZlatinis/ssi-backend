@@ -1,10 +1,11 @@
 import json
+import uuid
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.layers import get_channel_layer  # Import get_channel_layer
 
 from .models import Agent, Service
+from .utils import get_client_ip
 
 
 class AgentConsumer(AsyncWebsocketConsumer):
@@ -15,32 +16,58 @@ class AgentConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """
         Handles a new WebSocket connection.
-        Authenticates the agent based on the key in the URL.
+        Authenticates the agent based on the key in the URL. The key is validated
+        to be a proper UUID.
         """
-        self.agent_key = self.scope["url_route"]["kwargs"]["agent_key"]
+        # Use .get() for safe dictionary access to satisfy type checkers and prevent
+        # potential KeyErrors if the scope is not what we expect.
+        agent_key_str = (
+            self.scope.get("url_route", {}).get("kwargs", {}).get("agent_key")
+        )
+        if not agent_key_str:
+            print("Connection attempt with missing agent_key in URL.")
+            await self.close()
+            return
+
+        try:
+            self.agent_key = uuid.UUID(agent_key_str)
+        except (ValueError, TypeError):
+            # The provided key is not a valid UUID (e.g., "None").
+            print(f"Connection attempt with invalid key format: {agent_key_str}")
+            await self.close()
+            return
+
         self.agent = await self.get_agent(self.agent_key)
 
         if self.agent is None:
+            # The key was a valid UUID but not found or not registered.
+            # get_agent() already prints a message.
             await self.close()
         else:
             print(f"Agent '{self.agent.name}' connected successfully.")
             await self.accept()
             await self._set_agent_online_status(is_online=True)
 
+            # On successful connection, check and update the agent's IP address.
+            await self._check_and_update_agent_ip()
+
             # Dynamically define a group name based on the agent's owner
             owner_id = await self._get_agent_owner_id(self.agent)
             self.agent_owner_group_name = f"user_{owner_id}_agent_status_updates"
 
-            self.channel_layer = get_channel_layer()
-            # The AgentConsumer should only send messages, not receive from its
-            # own group.
-            # if self.channel_layer:
-            #     await self.channel_layer.group_add(
-            #         self.agent_owner_group_name,
-            #         self.channel_name
-            #     )
-            # Broadcast the initial online status to the user's group
-            await self._broadcast_agent_status(is_online=True)
+            if self.channel_layer:
+                # 1. Join a unique group for this agent connection. This allows
+                #    the backend (e.g., an HTTP view) to send direct messages
+                #    to this specific agent, like 'force_disconnect'.
+                self.agent_group_name = f"agent_{self.agent_key}"
+                await self.channel_layer.group_add(
+                    self.agent_group_name, self.channel_name
+                )
+
+                # 2. Broadcast the 'online' status to the user-facing group.
+                #    This group is listened to by the front-end SSE view to
+                #    provide real-time status updates to the user.
+                await self._broadcast_agent_status(is_online=True)
 
     async def disconnect(self, code):
         """
@@ -49,15 +76,14 @@ class AgentConsumer(AsyncWebsocketConsumer):
         if hasattr(self, "agent") and self.agent:
             print(f"Agent '{self.agent.name}' disconnected.")
             await self._set_agent_online_status(is_online=False)
-            # The AgentConsumer should only send messages, not receive from its
-            # own group.
-            # if hasattr(self, "channel_layer") and self.channel_layer:
-            #     await self.channel_layer.group_discard(
-            #         self.agent_owner_group_name,
-            #         self.channel_name
-            #     )
-            # Broadcast the offline status to the user's group
-            await self._broadcast_agent_status(is_online=False)
+            if hasattr(self, "channel_layer") and self.channel_layer:
+                # Discard from agent-specific group
+                if hasattr(self, "agent_group_name"):
+                    await self.channel_layer.group_discard(
+                        self.agent_group_name, self.channel_name
+                    )
+                # Broadcast the offline status to the user's group
+                await self._broadcast_agent_status(is_online=False)
         else:
             print("An unauthenticated agent disconnected.")
 
@@ -66,8 +92,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
         Receives a message from the agent, determines its type,
         and delegates to the appropriate handler.
         """
-        if not text_data:
+        if not text_data or not self.agent:
             return
+
+        # On every message, check if the agent's IP has changed and update it.
+        await self._check_and_update_agent_ip()
 
         try:
             data = json.loads(text_data)
@@ -81,8 +110,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 await self._handle_service_removed(data)
             elif event_type == "status_update":
                 await self._handle_status_update(data)
-                # After updating service status, broadcast an update to the user's group
-                await self._broadcast_service_status_update(data.get("update"))
             else:
                 print(f"Received unknown event type: {event_type}")
 
@@ -93,8 +120,21 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
     # --- Event Handlers ---
 
+    async def force_disconnect(self, event):
+        """
+        Handler for the 'force.disconnect' event.
+        Closes the WebSocket connection with a custom code.
+        """
+        if not self.agent:
+            return
+        print(f"Forcibly disconnecting agent {self.agent.name} due to unregistration.")
+        # 4001 is a custom code indicating the agent was unregistered.
+        await self.close(code=4001)
+
     async def _handle_agent_hello(self, event_data):
         """Synchronizes all services from the agent with the database."""
+        if not self.agent:
+            return
         print(f"Processing 'agent_hello' from {self.agent.name}")
         services_info = event_data.get("services", [])
         await self.sync_services_db(self.agent, services_info)
@@ -194,6 +234,29 @@ class AgentConsumer(AsyncWebsocketConsumer):
             )
 
     # --- Database Operations (wrapped for async context) ---
+
+    @database_sync_to_async
+    def _update_agent_ip_in_db(self, new_ip):
+        """
+        Updates the agent's IP address in the database.
+        This method is designed to be called from an async context.
+        """
+        if not self.agent:
+            return
+        self.agent.ip_address = new_ip
+        self.agent.save(update_fields=["ip_address"])
+        print(f"Updated IP address for agent '{self.agent.name}' to {new_ip}")
+
+    async def _check_and_update_agent_ip(self):
+        """
+        Checks if the agent's IP has changed and updates it in the DB if so.
+        """
+        if not self.agent:
+            return
+        current_ip = get_client_ip(self.scope)
+        # Only hit the DB if the IP is new and different from the last known one.
+        if current_ip and self.agent.ip_address != current_ip:
+            await self._update_agent_ip_in_db(current_ip)
 
     @database_sync_to_async
     def _set_agent_online_status(self, is_online: bool):
