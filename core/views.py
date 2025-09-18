@@ -1,18 +1,26 @@
 import asyncio
 import json
+from typing import Any, cast
 
-from asgiref.sync import sync_to_async  # Import sync_to_async
+from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from django.http import StreamingHttpResponse
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .authentication import AgentAuthentication, get_client_ip
-from .models import Agent
-from .serializers import AgentRegisterSerializer, AgentSerializer
+from .models import Agent, AgentRegistration
+from .serializers import (
+    AgentRegisterSerializer,
+    AgentRegistrationSerializer,
+    AgentSerializer,
+)
 
 
 class AgentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -100,6 +108,99 @@ class AgentUnregisterView(APIView):
             {"message": f"Agent '{agent.name}' has been unregistered."},
             status=status.HTTP_200_OK,
         )
+
+
+class InitiateAgentRegistrationView(APIView):
+    """
+    Starts the agent registration process by generating a 6-digit code.
+    """
+
+    @method_decorator(ratelimit(key="ip", rate="5/15m", block=True), name="post")
+    def post(self, request, *args, **kwargs):
+        registration = AgentRegistration.objects.create()
+        serializer = AgentRegistrationSerializer(registration)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@method_decorator(ratelimit(key="ip", rate="5/15m", block=True), name="post")
+class CompleteAgentRegistrationView(APIView):
+    """
+    Completes the agent registration using a 6-digit code.
+    This endpoint is rate-limited to prevent brute-force attacks.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        code = request.data.get("code")
+        if not code:
+            return Response(
+                {"detail": "Code is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            registration = AgentRegistration.objects.get(
+                code=code,
+                status="pending",
+                expires_at__gt=timezone.now(),
+            )
+        except AgentRegistration.DoesNotExist:
+            # Generic error to avoid leaking information
+            return Response(
+                {"detail": "Invalid or expired code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if registration.failed_attempts >= 5:
+            registration.status = "expired"
+            registration.save()
+            return Response(
+                {"detail": "Too many failed attempts. Please try again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Create the agent for the user who initiated the registration
+        agent = Agent.objects.create(
+            owner=request.user,
+            name=f"New Agent via Code {registration.code}",
+            registration_status=Agent.RegistrationStatus.REGISTERED,
+        )
+
+        # Store credentials and mark as completed
+        registration.status = "completed"
+        registration.agent_credentials = cast(Any, {"key": str(agent.key)})
+        registration.save()
+
+        return Response(
+            {"message": "Agent registered successfully!"}, status=status.HTTP_200_OK
+        )
+
+
+class AgentRegistrationStatusView(APIView):
+    """
+    Allows the CLI to poll for the status of a registration attempt.
+    """
+
+    # CLI does 12/1m this allows 2 attempts in a row
+    @method_decorator(ratelimit(key="ip", rate="120/15m", block=True), name="get")
+    def get(self, request, registration_id, *args, **kwargs):
+        try:
+            registration = AgentRegistration.objects.get(id=registration_id)
+        except AgentRegistration.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        if registration.status == "completed":
+            # Clean up and return credentials
+            credentials = registration.agent_credentials
+            registration.delete()
+            return Response({"status": "completed", "credentials": credentials})
+        elif (
+            registration.status == "expired" or registration.expires_at < timezone.now()
+        ):
+            registration.delete()
+            return Response({"status": "expired"}, status=status.HTTP_410_GONE)
+        else:
+            return Response({"status": "pending"})
 
 
 class AgentMeView(APIView):

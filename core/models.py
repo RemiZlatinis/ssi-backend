@@ -1,7 +1,10 @@
+import secrets
+import string
 import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 User = get_user_model()
@@ -80,3 +83,35 @@ class Service(models.Model):
 
     def __str__(self):
         return f"{self.name} on {self.agent.name}"
+
+
+class AgentRegistration(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("completed", "Completed"),
+        ("expired", "Expired"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=6, unique=True, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    expires_at = models.DateTimeField(blank=True)
+    failed_attempts = models.PositiveIntegerField(default=0)
+    agent_credentials = models.JSONField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Registration {self.id} - {self.status}"
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:  # On creation
+            self.expires_at = timezone.now() + timezone.timedelta(minutes=5)
+            self.code = self.generate_unique_code()
+        super().save(*args, **kwargs)
+
+    def generate_unique_code(self):
+        while True:
+            code = "".join(secrets.choice(string.digits) for _ in range(6))
+            if not AgentRegistration.objects.filter(
+                code=code, status="pending"
+            ).exists():
+                return code

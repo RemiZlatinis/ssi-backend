@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Agent, Service
+from .models import Agent, AgentRegistration, Service
 
 User = get_user_model()
 
@@ -40,7 +40,7 @@ class AgentSerializer(serializers.ModelSerializer):
 
     # This will nest the serialized services under each agent
     services = ServiceSerializer(many=True, read_only=True)
-    owner = serializers.StringRelatedField()
+    owner = AgentOwnerSerializer(read_only=True)
 
     class Meta:
         model = Agent
@@ -64,3 +64,10 @@ class AgentRegisterSerializer(serializers.Serializer):
 
     class Meta:
         fields = ["key"]
+
+
+class AgentRegistrationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgentRegistration
+        fields = ["id", "code", "status", "expires_at"]
+        read_only_fields = ["id", "status", "expires_at"]
