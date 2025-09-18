@@ -17,7 +17,10 @@ class Agent(models.Model):
         UNREGISTERED = "unregistered", "Unregistered"
 
     name = models.CharField(
-        max_length=50, help_text="Friendly name provided by the user"
+        max_length=50,
+        help_text=(
+            "A friendly name for the agent. Can be auto-generated on registration."
+        ),
     )
     key = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)

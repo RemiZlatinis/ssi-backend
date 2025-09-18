@@ -35,7 +35,8 @@ class AgentOwnerSerializer(serializers.ModelSerializer):
 
 class AgentSerializer(serializers.ModelSerializer):
     """
-    Serializer for the Agent model, with nested services.
+    Serializer for the Agent model.
+    Allows updating the agent's name, but other fields are read-only.
     """
 
     # This will nest the serialized services under each agent
@@ -52,6 +53,14 @@ class AgentSerializer(serializers.ModelSerializer):
             "registration_status",
             "created_at",
             "services",  # The nested list of services
+        ]
+        read_only_fields = [
+            "id",
+            "owner",
+            "ip_address",
+            "registration_status",
+            "created_at",
+            "services",
         ]
 
 
@@ -75,10 +84,7 @@ class AgentRegistrationSerializer(serializers.ModelSerializer):
 
 class CompleteAgentRegistrationSerializer(serializers.Serializer):
     """
-    Serializer for completing agent registration with a code and a name.
+    Serializer for completing agent registration with a code.
     """
 
     code = serializers.CharField(max_length=6, min_length=6)
-    name = serializers.CharField(
-        max_length=50, help_text="A friendly name for the new agent."
-    )

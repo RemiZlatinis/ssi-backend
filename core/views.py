@@ -9,7 +9,7 @@ from django.http import StreamingHttpResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
-from rest_framework import status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,10 +25,12 @@ from .serializers import (
 from .utils import get_client_ip
 
 
-class AgentViewSet(viewsets.ReadOnlyModelViewSet):
+class AgentViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
     """
-    A read-only ViewSet that provides `list` and `retrieve` actions
-    for agents, including their nested services.
+    A ViewSet that provides `list`, `retrieve`, and `partial_update` actions
+    for agents.
+
+    This allows users to view their agents and rename them (via PATCH).
     """
 
     serializer_class = AgentSerializer
@@ -45,6 +47,37 @@ class AgentViewSet(viewsets.ReadOnlyModelViewSet):
         if user.is_authenticated:
             return Agent.objects.filter(owner=user).prefetch_related("services")
         return Agent.objects.none()
+
+    def perform_update(self, serializer):
+        """
+        Override to broadcast a real-time event after updating the agent.
+        """
+        # First, save the instance to apply the update
+        super().perform_update(serializer)
+
+        # After saving, get the updated instance and its owner
+        agent = serializer.instance
+        owner = agent.owner
+
+        # Get the channel layer to send a notification
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            # Define the group name for the agent's owner
+            group_name = f"user_{owner.id}_agent_status_updates"
+
+            # Send a message to the group with the updated agent data.
+            # We reuse the 'agent.status.update' event to simplify client-side logic,
+            # as it can handle both status and data changes like renaming.
+            async_to_sync(channel_layer.group_send)(
+                group_name,
+                {
+                    "type": "agent.status.update",
+                    "agent_id": str(agent.pk),
+                    "agent_name": agent.name,  # The new name
+                    "is_online": agent.is_online,
+                    "ip_address": agent.ip_address,
+                },
+            )
 
 
 class AgentRegisterView(APIView):
@@ -84,7 +117,11 @@ class AgentRegisterView(APIView):
         agent.save()
 
         return Response(
-            {"message": f"Agent '{agent.name}' registered successfully!"},
+            {
+                "id": agent.pk,
+                "name": agent.name,
+                "message": f"Agent '{agent.name}' registered successfully!",
+            },
             status=status.HTTP_200_OK,
         )
 
@@ -162,7 +199,6 @@ class CompleteAgentRegistrationView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         code = validated_data["code"]
-        name = validated_data["name"]
 
         try:
             registration = AgentRegistration.objects.get(
@@ -186,11 +222,13 @@ class CompleteAgentRegistrationView(APIView):
             )
 
         # Create the agent for the user who initiated the registration
-        agent = Agent.objects.create(
+        # A temporary name is generated. The user can rename it later.
+        agent = Agent(
             owner=request.user,
-            name=name,
             registration_status=Agent.RegistrationStatus.REGISTERED,
         )
+        agent.name = f"Agent-{str(agent.key)[:8]}"
+        agent.save()
 
         # Store credentials and mark as completed
         registration.status = "completed"
