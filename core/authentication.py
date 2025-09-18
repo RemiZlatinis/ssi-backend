@@ -2,16 +2,7 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
 from .models import Agent
-
-
-def get_client_ip(request):
-    """Get the client's real IP address from the request."""
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-    if x_forwarded_for:
-        ip = x_forwarded_for.split(",")[0]
-    else:
-        ip = request.META.get("REMOTE_ADDR")
-    return ip
+from .utils import get_client_ip
 
 
 class AgentAuthentication(BaseAuthentication):
@@ -40,6 +31,7 @@ class AgentAuthentication(BaseAuthentication):
 
         # Update IP address on successful authentication
         current_ip = get_client_ip(request)
+        print(agent.ip_address, current_ip)
         if agent.ip_address != current_ip:
             agent.ip_address = current_ip
             agent.save(update_fields=["ip_address"])
