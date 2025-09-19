@@ -16,6 +16,7 @@ dependencies = [
     "dj-rest-auth (>=7.0.1,<8.0.0)",
     "django-ratelimit (>=4.0.0,<5.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
+    "python-dotenv (>=1.1.1,<2.0.0)",
 ]
 
 [tool.poetry]
