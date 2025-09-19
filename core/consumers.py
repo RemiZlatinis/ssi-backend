@@ -193,8 +193,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     "agent_id": str(self.agent.pk),
                     "agent_name": self.agent.name,
                     "service_id": update_data.get("service_id"),
-                    "status": update_data.get("status"),
-                    "message": update_data.get("message"),
+                    "status": update_data.get("status", "UNKNOWN"),
+                    "message": update_data.get("message", ""),
+                    # TODO: Move all the timestamp logic to the backend
                     "timestamp": update_data.get("timestamp"),
                 },
             )
@@ -227,8 +228,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     "version": service_info.get("version"),
                     "schedule": service_info.get("schedule"),
                     # Initial status for a newly added service
-                    "last_status": None,
-                    "last_message": None,
+                    "last_status": "UNKNOWN",
+                    "last_message": "",
                     "last_seen": None,  # Will be updated on first status report
                 },
             )
@@ -312,9 +313,13 @@ class AgentConsumer(AsyncWebsocketConsumer):
             service = Service.objects.get(
                 agent=agent, agent_service_id=update_data["service_id"]
             )
-            service.last_status = update_data["status"]
-            service.last_message = update_data["message"]
-            service.last_seen = update_data["timestamp"]
+            # Status is considered mandatory, message and timestamp are optional.
+            service.last_status = update_data.get("status", "UNKNOWN")
+            service.last_message = update_data.get("message", "")
+            # TODO: Move all the timestamp logic to the backend
+            service.last_seen = update_data.get(
+                "timestamp",
+            )
             service.save()
         except Service.DoesNotExist:
             print(

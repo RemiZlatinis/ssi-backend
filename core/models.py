@@ -72,9 +72,9 @@ class Service(models.Model):
 
     # Dynamic State (Last Known Update)
     last_status = models.CharField(
-        max_length=10, choices=Status.choices, default=Status.UNKNOWN, blank=True
+        max_length=10, choices=Status.choices, default=Status.UNKNOWN
     )
-    last_message = models.TextField(blank=True)
+    last_message = models.TextField(null=False, blank=True)
     last_seen = models.DateTimeField(
         null=True, blank=True, help_text="Timestamp of the last status update."
     )
