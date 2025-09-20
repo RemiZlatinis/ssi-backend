@@ -60,3 +60,7 @@ docs/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Building scripts
+build-prod.sh
+build-prod.bat
