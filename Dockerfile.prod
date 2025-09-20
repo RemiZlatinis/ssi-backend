@@ -53,6 +53,9 @@ RUN pip install --no-cache-dir --no-deps -r requirements.txt
 # Copy project files
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x /app/entrypoint.prod.sh
+
 # Collect static files during build
 RUN python manage.py collectstatic --noinput
 
@@ -69,5 +72,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python manage.py healthcheck
 
-# Run daphne ASGI server for production
+# Use entrypoint to wait for DB, run migrations, and then start the app
+ENTRYPOINT ["/app/entrypoint.prod.sh"]
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "project.asgi:application"]
