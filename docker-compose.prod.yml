@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:17-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=${SQL_DATABASE}
+      - POSTGRES_USER=${SQL_USER}
+      - POSTGRES_PASSWORD=${SQL_PASSWORD}
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: valkey
+    restart: always
+
+  backend:
+    image: ssi-backend:prod
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./.env
+    depends_on:
+      - db
+      - valkey
+
+volumes:
+  postgres_data:
