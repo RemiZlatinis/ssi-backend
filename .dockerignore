@@ -1,0 +1,62 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+*.log
+media/
+
+# Environment variables
+.env
+
+# IDE / Editor specific
+.vscode/
+.idea/
+
+# Ruff
+.ruff_cache
+
+# Pre-commit
+.pre-commit-config.yaml
+
+# Docker
+Dockerfile.prod
+docker-compose.prod.yml
+
+# Documentation
+README.md
+docs/
+
+# Tests (if not needed in image)
+# Uncomment if tests should be excluded
+# */tests.py
+# */tests/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
