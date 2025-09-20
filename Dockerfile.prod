@@ -1,0 +1,73 @@
+# Multi-stage build for optimized production image
+# Stage 1: Build dependencies
+FROM python:3.12-alpine as builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    postgresql-dev
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    POETRY_NO_INTERACTION=1
+
+# Install poetry and export plugin
+RUN pip install poetry poetry-plugin-export
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files
+COPY poetry.lock pyproject.toml ./
+
+# Export requirements.txt with only production dependencies
+RUN poetry export --without dev -o requirements.txt --without-hashes
+
+# Stage 2: Production image
+FROM python:3.12-alpine
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    postgresql-libs
+
+# Create non-root user for security
+RUN adduser -D ssi-user
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements from builder stage
+COPY --from=builder /app/requirements.txt /app/requirements.txt
+
+# Install only production dependencies globally (not with --user)
+RUN pip install --no-cache-dir --no-deps -r requirements.txt
+
+# Copy project files
+COPY . .
+
+# Collect static files during build
+# RUN python manage.py collectstatic --noinput
+
+# Change ownership to non-root user
+RUN chown -R ssi-user:ssi-user /app
+
+# Switch to non-root user
+USER ssi-user
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python manage.py healthcheck
+
+# Run daphne ASGI server for production
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "project.asgi:application"]
