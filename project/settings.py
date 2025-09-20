@@ -55,6 +55,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "servestatic.middleware.ServeStaticMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -130,6 +131,11 @@ TEMPLATES = [
     },
 ]
 
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "servestatic.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 SITE_ID = 1  # The one and only site on DB. This is required for the django-allauth
 

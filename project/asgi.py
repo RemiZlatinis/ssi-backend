@@ -11,10 +11,16 @@ import os
 
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
+from servestatic import ServeStaticASGI
+
+from .settings import STATIC_ROOT
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
 
 django_asgi_app = get_asgi_application()
+
+if os.environ.get("ENVIRONMENT") == "production":
+    django_asgi_app = ServeStaticASGI(django_asgi_app, root=STATIC_ROOT)
 
 import core.routing  # noqa: E402
 

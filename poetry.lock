@@ -1081,6 +1081,24 @@ files = [
 ]
 
 [[package]]
+name = "servestatic"
+version = "3.1.0"
+description = "Production-grade static file server for Python WSGI & ASGI."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "servestatic-3.1.0-py3-none-any.whl", hash = "sha256:9ca4257a155d053047c60c196fc230ee2193a80b810761022e53584c3309eea9"},
+    {file = "servestatic-3.1.0.tar.gz", hash = "sha256:3d0c191e0c570b56a387c7ed400ca535b4a37f73cd9a68a50be4d1abd735a000"},
+]
+
+[package.dependencies]
+asgiref = "*"
+
+[package.extras]
+brotli = ["brotli"]
+
+[[package]]
 name = "service-identity"
 version = "24.2.0"
 description = "Service identity verification for pyOpenSSL & cryptography."
@@ -1297,4 +1315,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "5b07ae76bb90fdb62fe5a236031feb88be706a18f5d3fbe55b05f50be0695504"
+content-hash = "ba9b9dfcef2191f9263cf54aace2436e9ba6e244d212f034c20bc9d3824a8dcd"
