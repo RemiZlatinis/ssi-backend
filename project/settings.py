@@ -159,7 +159,10 @@ SIMPLE_JWT = {
 # django_channels
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("valkey", 6379)],
+        },
     },
 }
 
