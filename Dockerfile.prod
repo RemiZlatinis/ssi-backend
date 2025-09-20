@@ -54,7 +54,7 @@ RUN pip install --no-cache-dir --no-deps -r requirements.txt
 COPY . .
 
 # Collect static files during build
-# RUN python manage.py collectstatic --noinput
+RUN python manage.py collectstatic --noinput
 
 # Change ownership to non-root user
 RUN chown -R ssi-user:ssi-user /app
