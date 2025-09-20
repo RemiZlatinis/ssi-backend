@@ -4,6 +4,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+import dj_database_url
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -182,5 +183,17 @@ elif ENVIRONMENT == "production":
     if not SECRET_KEY:
         raise ValueError("SECRET_KEY is not set for a production environment!")
 
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL is not set for a production environment!")
+    else:
+        DATABASES = {"default": dj_database_url.parse(DATABASE_URL)}
+
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [os.environ.get("REDIS_URL")]},
+        },
+    }
 else:
     raise ValueError(f"Invalid ENVIRONMENT value: {ENVIRONMENT}")
