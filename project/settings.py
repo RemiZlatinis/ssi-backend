@@ -190,6 +190,10 @@ elif ENVIRONMENT == "production":
     if not SECRET_KEY:
         raise ValueError("SECRET_KEY is not set for a production environment!")
 
+    host = os.getenv("HOST")
+    if host:
+        CSRF_TRUSTED_ORIGINS = [f"https://{host}"]
+
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
         raise ValueError("DATABASE_URL is not set for a production environment!")
