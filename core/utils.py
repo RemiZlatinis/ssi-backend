@@ -1,4 +1,13 @@
-def get_client_ip(scope_or_request):
+from __future__ import annotations
+
+from typing import Any, cast
+
+from django.http import HttpRequest
+
+
+def get_client_ip(
+    scope_or_request: HttpRequest | dict[str, Any],
+) -> str | None:
     """
     Get the client's real IP address from a request or a WebSocket scope.
 
@@ -12,19 +21,25 @@ def get_client_ip(scope_or_request):
     Returns:
         The client's IP address as a string, or None if it cannot be determined.
     """
-    # Check if it's a Django request object (has a 'META' attribute)
-    if hasattr(scope_or_request, "META"):
+    # Check if it's a Django request object
+    if isinstance(scope_or_request, HttpRequest):
         x_forwarded_for = scope_or_request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            return x_forwarded_for.split(",")[0].strip()
+            return cast(str, x_forwarded_for).split(",")[0].strip()
         return scope_or_request.META.get("REMOTE_ADDR")
 
-    # Check if it's a Channels scope object (has a 'headers' attribute)
-    if "headers" in scope_or_request:
-        headers = dict(scope_or_request.get("headers", []))
-        x_forwarded_for = headers.get(b"x-forwarded-for")
-        if x_forwarded_for:
-            return x_forwarded_for.decode("utf-8").split(",")[0].strip()
-        return scope_or_request.get("client", (None, None))[0]
+    # Check if it's a Channels scope object
+    elif isinstance(scope_or_request, dict):
+        if "headers" in scope_or_request:
+            headers_list = scope_or_request.get("headers", [])
+            headers = dict(cast(list[tuple[bytes, bytes]], headers_list))
+            x_forwarded_for = headers.get(b"x-forwarded-for")
+            if x_forwarded_for:
+                return x_forwarded_for.decode("utf-8").split(",")[0].strip()
+
+        # Fallback to client info if available
+        client_info = scope_or_request.get("client", (None, None))
+        ip_tuple = cast(tuple[str | None, int | None], client_info)
+        return ip_tuple[0]
 
     return None

@@ -1,17 +1,22 @@
 import asyncio
 import json
-from typing import Any, cast
+import uuid
+from typing import Any, AsyncGenerator, cast
 
 from asgiref.sync import async_to_sync, sync_to_async
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
-from django.http import StreamingHttpResponse
+from django.contrib.auth.models import User as AuthUser
+from django.db.models.query import QuerySet
+from django.http import HttpRequest, StreamingHttpResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
 from .authentication import AgentAuthentication
@@ -37,7 +42,7 @@ class AgentViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     # Do you want a headache? Remove the # type ignore
-    def get_queryset(self):  # type: ignore
+    def get_queryset(self) -> QuerySet[Agent]:
         """
         This view should return a list of all the agents
         for the currently authenticated user.
@@ -48,7 +53,7 @@ class AgentViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
             return Agent.objects.filter(owner=user).prefetch_related("services")
         return Agent.objects.none()
 
-    def perform_update(self, serializer):
+    def perform_update(self, serializer: BaseSerializer[Any]) -> None:
         """
         Override to broadcast a real-time event after updating the agent.
         """
@@ -57,27 +62,28 @@ class AgentViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
 
         # After saving, get the updated instance and its owner
         agent = serializer.instance
-        owner = agent.owner
+        if agent:
+            owner = agent.owner
 
-        # Get the channel layer to send a notification
-        channel_layer = get_channel_layer()
-        if channel_layer:
-            # Define the group name for the agent's owner
-            group_name = f"user_{owner.id}_agent_status_updates"
+            # Get the channel layer to send a notification
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                # Define the group name for the agent's owner
+                group_name = f"user_{owner.id}_agent_status_updates"
 
-            # Send a message to the group with the updated agent data.
-            # We reuse the 'agent.status.update' event to simplify client-side logic,
-            # as it can handle both status and data changes like renaming.
-            async_to_sync(channel_layer.group_send)(
-                group_name,
-                {
-                    "type": "agent.status.update",
-                    "agent_id": str(agent.pk),
-                    "agent_name": agent.name,  # The new name
-                    "is_online": agent.is_online,
-                    "ip_address": agent.ip_address,
-                },
-            )
+                # Send a message to the group with the updated agent data.
+                # We reuse the 'agent.status.update' event to simplify client-side
+                # logic, as it can handle both status and data changes like renaming.
+                async_to_sync(channel_layer.group_send)(
+                    group_name,
+                    {
+                        "type": "agent.status.update",
+                        "agent_id": str(agent.pk),
+                        "agent_name": agent.name,  # The new name
+                        "is_online": agent.is_online,
+                        "ip_address": agent.ip_address,
+                    },
+                )
 
 
 class AgentRegisterView(APIView):
@@ -86,7 +92,7 @@ class AgentRegisterView(APIView):
     This is a public endpoint.
     """
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         serializer = AgentRegisterSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -134,8 +140,8 @@ class AgentUnregisterView(APIView):
     authentication_classes = [AgentAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, *args, **kwargs):
-        agent = request.auth
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        agent = cast(Agent, request.auth)
 
         # First, delete all associated services for a clean slate.
         # This prevents orphaned service records.
@@ -170,7 +176,7 @@ class InitiateAgentRegistrationView(APIView):
     """
 
     @method_decorator(ratelimit(key="ip", rate="5/15m", block=True), name="post")
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         registration = AgentRegistration.objects.create()
         serializer = AgentRegistrationSerializer(registration)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -185,7 +191,7 @@ class CompleteAgentRegistrationView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         serializer = CompleteAgentRegistrationSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -224,7 +230,7 @@ class CompleteAgentRegistrationView(APIView):
         # Create the agent for the user who initiated the registration
         # A temporary name is generated. The user can rename it later.
         agent = Agent(
-            owner=request.user,
+            owner=cast(AuthUser, request.user),
             registration_status=Agent.RegistrationStatus.REGISTERED,
         )
         agent.name = f"Agent-{str(agent.key)[:8]}"
@@ -247,7 +253,9 @@ class AgentRegistrationStatusView(APIView):
 
     # CLI does 12/1m this allows 2 attempts in a row
     @method_decorator(ratelimit(key="ip", rate="120/15m", block=True), name="get")
-    def get(self, request, registration_id, *args, **kwargs):
+    def get(
+        self, request: Request, registration_id: uuid.UUID, *args: Any, **kwargs: Any
+    ) -> Response:
         try:
             registration = AgentRegistration.objects.get(id=registration_id)
         except AgentRegistration.DoesNotExist:
@@ -271,7 +279,7 @@ class AgentMeView(APIView):
     authentication_classes = [AgentAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
         """
         Returns information about the agent making the request.
         """
@@ -280,7 +288,7 @@ class AgentMeView(APIView):
         return Response(serializer.data)
 
 
-async def sse_agent_status(request):
+async def sse_agent_status(request: HttpRequest) -> StreamingHttpResponse:
     """
     A view that streams agent connection status and service updates
     using Server-Sent Events.
@@ -307,7 +315,7 @@ async def sse_agent_status(request):
     user_id = await sync_to_async(lambda: user.id)()
     USER_AGENT_STATUS_GROUP_NAME = f"user_{user_id}_agent_status_updates"
 
-    async def event_stream():
+    async def event_stream() -> AsyncGenerator[bytes, None]:
         channel_layer = get_channel_layer()
         if not channel_layer:
             # If channel layer is not configured (e.g., in-memory without run_asgi),
@@ -393,7 +401,7 @@ async def sse_agent_status(request):
 
 
 @database_sync_to_async
-def get_all_agent_statuses(user):
+def get_all_agent_statuses(user: Any) -> list[dict[str, Any]]:
     """
     Fetches all registered agents for a given user and their current online status
     from the database. Also fetches their services and their last known status.
@@ -404,7 +412,7 @@ def get_all_agent_statuses(user):
 
     all_data = []
     for agent in agents:
-        agent_data = {
+        agent_data: dict[str, Any] = {
             "agent_id": str(agent.pk),
             "agent_name": agent.name,
             "is_online": agent.is_online,  # Use the is_online field
@@ -412,7 +420,7 @@ def get_all_agent_statuses(user):
             "registration_status": agent.registration_status,
             "services": [],
         }
-        for service in agent.services.all():  # type: ignore
+        for service in agent.services.all():
             agent_data["services"].append(
                 {
                     "service_id": service.agent_service_id,

@@ -1,6 +1,8 @@
 import secrets
 import string
 import uuid
+from datetime import timedelta
+from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -42,7 +44,7 @@ class Agent(models.Model):
     class Meta:
         ordering = ["name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -84,7 +86,7 @@ class Service(models.Model):
         unique_together = ("agent", "agent_service_id")
         ordering = ["name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name} on {self.agent.name}"
 
 
@@ -102,16 +104,16 @@ class AgentRegistration(models.Model):
     failed_attempts = models.PositiveIntegerField(default=0)
     agent_credentials = models.JSONField(null=True, blank=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Registration {self.id} - {self.status}"
 
-    def save(self, *args, **kwargs):
+    def save(self, *args: Any, **kwargs: Any) -> None:
         if self._state.adding:  # On creation
-            self.expires_at = timezone.now() + timezone.timedelta(minutes=1)
+            self.expires_at = timezone.now() + timedelta(minutes=1)
             self.code = self.generate_unique_code()
         super().save(*args, **kwargs)
 
-    def generate_unique_code(self):
+    def generate_unique_code(self) -> str:
         while True:
             code = "".join(secrets.choice(string.digits) for _ in range(6))
             if not AgentRegistration.objects.filter(

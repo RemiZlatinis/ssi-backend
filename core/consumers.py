@@ -1,5 +1,6 @@
 import json
 import uuid
+from typing import Any
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -13,7 +14,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
     WebSocket consumer that handles connections from agents.
     """
 
-    async def connect(self):
+    async def connect(self) -> None:
         """
         Handles a new WebSocket connection.
         Authenticates the agent based on the key in the URL. The key is validated
@@ -69,7 +70,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 #    provide real-time status updates to the user.
                 await self._broadcast_agent_status(is_online=True)
 
-    async def disconnect(self, code):
+    async def disconnect(self, code: int) -> None:
         """
         Called when the WebSocket connection is closed.
         """
@@ -87,7 +88,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
         else:
             print("An unauthenticated agent disconnected.")
 
-    async def receive(self, text_data=None, bytes_data=None):
+    async def receive(
+        self, text_data: str | None = None, bytes_data: bytes | None = None
+    ) -> None:
         """
         Receives a message from the agent, determines its type,
         and delegates to the appropriate handler.
@@ -120,7 +123,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
     # --- Event Handlers ---
 
-    async def force_disconnect(self, event):
+    async def force_disconnect(self, event: dict[str, Any]) -> None:
         """
         Handler for the 'force.disconnect' event.
         Closes the WebSocket connection with a custom code.
@@ -131,7 +134,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         # 4001 is a custom code indicating the agent was unregistered.
         await self.close(code=4001)
 
-    async def _handle_agent_hello(self, event_data):
+    async def _handle_agent_hello(self, event_data: dict[str, Any]) -> None:
         """Synchronizes all services from the agent with the database."""
         if not self.agent:
             return
@@ -139,7 +142,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         services_info = event_data.get("services", [])
         await self.sync_services_db(self.agent, services_info)
 
-    async def _handle_service_added(self, event_data):
+    async def _handle_service_added(self, event_data: dict[str, Any]) -> None:
         """Adds a single new service to the database."""
         service_info = event_data.get("service")
         if service_info:
@@ -148,7 +151,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             # After adding/updating service, broadcast an update to the user's group
             await self._broadcast_service_added(service_info)
 
-    async def _handle_service_removed(self, event_data):
+    async def _handle_service_removed(self, event_data: dict[str, Any]) -> None:
         """Removes a single service from the database."""
         service_id = event_data.get("service_id")
         if service_id:
@@ -157,7 +160,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             # After removing service, broadcast an update to the user's group
             await self._broadcast_service_removed(service_id)
 
-    async def _handle_status_update(self, event_data):
+    async def _handle_status_update(self, event_data: dict[str, Any]) -> None:
         """Updates the status of a single service."""
         update = event_data.get("update")
         if update:
@@ -170,7 +173,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
     # --- Broadcasting Methods ---
 
-    async def _broadcast_agent_status(self, is_online: bool):
+    async def _broadcast_agent_status(self, is_online: bool) -> None:
         """Sends an agent online/offline status update to the channel layer group."""
         if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
             await self.channel_layer.group_send(
@@ -183,7 +186,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 },
             )
 
-    async def _broadcast_service_status_update(self, update_data: dict):
+    async def _broadcast_service_status_update(self, update_data: dict) -> None:
         """Sends a service status update to the channel layer group."""
         if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
             await self.channel_layer.group_send(
@@ -200,7 +203,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 },
             )
 
-    async def _broadcast_service_removed(self, service_id: str):
+    async def _broadcast_service_removed(self, service_id: str) -> None:
         """Sends a service removed event to the channel layer group."""
         if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
             await self.channel_layer.group_send(
@@ -213,7 +216,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 },
             )
 
-    async def _broadcast_service_added(self, service_info: dict):
+    async def _broadcast_service_added(self, service_info: dict) -> None:
         """Sends a service added/updated event to the channel layer group."""
         if hasattr(self, "channel_layer") and self.channel_layer and self.agent:
             await self.channel_layer.group_send(
@@ -237,7 +240,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
     # --- Database Operations (wrapped for async context) ---
 
     @database_sync_to_async
-    def _update_agent_ip_in_db(self, new_ip):
+    def _update_agent_ip_in_db(self, new_ip: str | None) -> None:
         """
         Updates the agent's IP address in the database.
         This method is designed to be called from an async context.
@@ -248,7 +251,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         self.agent.save(update_fields=["ip_address"])
         print(f"Updated IP address for agent '{self.agent.name}' to {new_ip}")
 
-    async def _check_and_update_agent_ip(self):
+    async def _check_and_update_agent_ip(self) -> None:
         """
         Checks if the agent's IP has changed and updates it in the DB if so.
         """
@@ -260,14 +263,16 @@ class AgentConsumer(AsyncWebsocketConsumer):
             await self._update_agent_ip_in_db(current_ip)
 
     @database_sync_to_async
-    def _set_agent_online_status(self, is_online: bool):
+    def _set_agent_online_status(self, is_online: bool) -> None:
         """Sets the agent's online status in the database."""
         if self.agent:
             self.agent.is_online = is_online
             self.agent.save(update_fields=["is_online"])
 
     @database_sync_to_async
-    def sync_services_db(self, agent, services_info):
+    def sync_services_db(
+        self, agent: Agent, services_info: list[dict[str, Any]]
+    ) -> None:
         """Full sync: update/create services from the list, remove any not present."""
         incoming_service_ids = {s["id"] for s in services_info}
 
@@ -288,7 +293,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
         agent.services.exclude(agent_service_id__in=incoming_service_ids).delete()
 
     @database_sync_to_async
-    def add_or_update_service_db(self, agent, service_info):
+    def add_or_update_service_db(
+        self, agent: Agent, service_info: dict[str, Any]
+    ) -> None:
         """Creates or updates a single service."""
         Service.objects.update_or_create(
             agent=agent,
@@ -302,12 +309,14 @@ class AgentConsumer(AsyncWebsocketConsumer):
         )
 
     @database_sync_to_async
-    def remove_service_db(self, agent, service_id):
+    def remove_service_db(self, agent: Agent, service_id: str) -> None:
         """Removes a single service."""
         Service.objects.filter(agent=agent, agent_service_id=service_id).delete()
 
     @database_sync_to_async
-    def update_service_status_db(self, agent, update_data):
+    def update_service_status_db(
+        self, agent: Agent, update_data: dict[str, Any]
+    ) -> None:
         """Updates the last known status of a service."""
         try:
             service = Service.objects.get(
@@ -328,12 +337,12 @@ class AgentConsumer(AsyncWebsocketConsumer):
             )
 
     @database_sync_to_async
-    def _get_agent_owner_id(self, agent):
+    def _get_agent_owner_id(self, agent: Agent) -> int:
         """Asynchronously fetches the owner ID of an agent."""
         return agent.owner.id
 
     @database_sync_to_async
-    def get_agent(self, key):
+    def get_agent(self, key: uuid.UUID) -> Agent | None:
         """
         Asynchronously fetches the agent from the database.
         """

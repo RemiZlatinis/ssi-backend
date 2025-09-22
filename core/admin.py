@@ -1,4 +1,7 @@
+from typing import Any
+
 from django.contrib import admin
+from django.http import HttpRequest
 
 from .models import Agent, Service
 
@@ -15,7 +18,7 @@ class ServiceInline(admin.TabularInline):
     readonly_fields = fields  # All fields are read-only
     can_delete = False  # Services are managed by the agent
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request: HttpRequest, obj: Any | None = None) -> bool:
         # Prevent adding new services from the admin
         return False
 
@@ -49,8 +52,10 @@ class ServiceAdmin(admin.ModelAdmin):
     # All fields are managed by the agent, so they should be read-only.
     readonly_fields = [field.name for field in Service._meta.fields]
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 
-    def has_delete_permission(self, request, obj=None):
+    def has_delete_permission(
+        self, request: HttpRequest, obj: Any | None = None
+    ) -> bool:
         return False

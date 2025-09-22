@@ -3,6 +3,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import dj_database_url
 from dotenv import load_dotenv
@@ -69,7 +70,7 @@ MIDDLEWARE = [
 WSGI_APPLICATION = "project.wsgi.application"
 ASGI_APPLICATION = "project.asgi.application"
 
-DATABASES = {
+DATABASES: dict[str, dict[str, Any]] = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.getenv("SQL_DATABASE"),
@@ -186,9 +187,10 @@ if ENVIRONMENT == "development":
     ]
 
 elif ENVIRONMENT == "production":
-    SECRET_KEY = os.getenv("SECRET_KEY")
-    if not SECRET_KEY:
+    _SECRET_KEY = os.getenv("SECRET_KEY")
+    if not _SECRET_KEY:
         raise ValueError("SECRET_KEY is not set for a production environment!")
+    SECRET_KEY = _SECRET_KEY
 
     host = os.getenv("HOST")
     if host:
@@ -198,7 +200,9 @@ elif ENVIRONMENT == "production":
     if not DATABASE_URL:
         raise ValueError("DATABASE_URL is not set for a production environment!")
     else:
-        DATABASES = {"default": dj_database_url.parse(DATABASE_URL)}
+        DATABASES = {
+            "default": cast(dict[str, Any], dj_database_url.parse(DATABASE_URL))
+        }
 
     CHANNEL_LAYERS = {
         "default": {
