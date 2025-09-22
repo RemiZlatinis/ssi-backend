@@ -32,6 +32,9 @@ black = "^25.1.0"
 ruff = "^0.13.0"
 django-debug-toolbar = "^6.0.0"
 pre-commit = "^3.8.0"
+mypy = "^1.18.2"
+django-stubs = {extras = ["compatible-mypy"], version = "^5.2.5"}
+djangorestframework-stubs = "^3.16.3"
 
 [tool.black]
 line-length = 88
