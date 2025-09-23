@@ -319,17 +319,19 @@ class AgentConsumer(AsyncWebsocketConsumer):
     ) -> None:
         """Updates the last known status of a service."""
         try:
+            # Use get() to fetch the instance, which is necessary to trigger signals.
             service = Service.objects.get(
                 agent=agent, agent_service_id=update_data["service_id"]
             )
-            # Status is considered mandatory, message and timestamp are optional.
+            # Update the fields on the instance
             service.last_status = update_data.get("status", "UNKNOWN")
             service.last_message = update_data.get("message", "")
             # TODO: Move all the timestamp logic to the backend
-            service.last_seen = update_data.get(
-                "timestamp",
-            )
-            service.save()
+            service.last_seen = update_data.get("timestamp")
+
+            # Call save() and specify which fields to update for efficiency.
+            # This will now correctly trigger the pre_save and post_save signals.
+            service.save(update_fields=["last_status", "last_message", "last_seen"])
         except Service.DoesNotExist:
             print(
                 f"Warning: Received status update for unknown service ID "

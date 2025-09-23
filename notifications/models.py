@@ -57,7 +57,7 @@ class Device(models.Model):
     def send_notification(
         self,
         title: str = "Title",
-        body: str = "Body",
+        body: str = "",
         data: dict[str, Any] | None = None,
         **extra: Any,
     ) -> dict[str, Any] | None:
