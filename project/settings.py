@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "channels",
+    "allauth",
     "allauth.headless",
     "allauth.account",
     "allauth.socialaccount",
