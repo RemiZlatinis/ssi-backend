@@ -145,10 +145,15 @@ STORAGES = {
 SITE_ID = 1  # The one and only site on DB. This is required for the django-allauth
 
 # django-allauth settings
-ACCOUNT_AUTHENTICATION_METHODS = {
-    "username",  # Use the username, default on allauth is the email
-}
+ACCOUNT_AUTHENTICATION_METHOD = (
+    "username_email"  # Allow login with either username or email
+)
+ACCOUNT_EMAIL_REQUIRED = True  # Make email a required field
+ACCOUNT_USERNAME_REQUIRED = False  # Do not require a username
 ACCOUNT_EMAIL_VERIFICATION = "none"  # Allow active user without verified email
+SOCIALACCOUNT_AUTO_SIGNUP = (
+    True  # Automatically sign up users on successful social login
+)
 HEADLESS_ONLY = True  # Operate in headless mode
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True  # auto-link social accounts with emails.
 
