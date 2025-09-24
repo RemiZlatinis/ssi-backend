@@ -46,13 +46,16 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "channels",
-    "allauth",
+    "allauth.headless",
     "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
     "dj_rest_auth",
     "corsheaders",
     # Project
     "core",
     "notifications",
+    "authentication",
 ]
 
 MIDDLEWARE = [
@@ -146,6 +149,8 @@ ACCOUNT_AUTHENTICATION_METHODS = {
     "username",  # Use the username, default on allauth is the email
 }
 ACCOUNT_EMAIL_VERIFICATION = "none"  # Allow active user without verified email
+HEADLESS_ONLY = True  # Operate in headless mode
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True  # auto-link social accounts with emails.
 
 # DRF settings
 REST_FRAMEWORK = {
@@ -158,6 +163,7 @@ REST_FRAMEWORK = {
 REST_AUTH = {
     "USE_JWT": True,
     "JWT_AUTH_REFRESH_COOKIE": None,
+    "USER_DETAILS_SERIALIZER": "authentication.serializers.CustomUserDetailsSerializer",
 }
 
 # rest_framework_simplejwt settings
@@ -175,6 +181,7 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
 
 ###############################################
 # SETTINGS OVERRIDES based on the environment #

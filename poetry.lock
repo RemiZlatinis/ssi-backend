@@ -539,6 +539,7 @@ files = [
 
 [package.dependencies]
 Django = ">=4.2,<6.0"
+django-allauth = {version = ">=64.0.0", extras = ["socialaccount"], optional = true, markers = "extra == \"with-social\""}
 djangorestframework = ">=3.13.0"
 
 [package.extras]
@@ -579,6 +580,9 @@ files = [
 [package.dependencies]
 asgiref = ">=3.8.1"
 Django = ">=4.2.16"
+oauthlib = {version = ">=3.3.0,<4", optional = true, markers = "extra == \"socialaccount\""}
+pyjwt = {version = ">=2.0,<3", extras = ["crypto"], optional = true, markers = "extra == \"socialaccount\""}
+requests = {version = ">=2.0.0,<3", optional = true, markers = "extra == \"socialaccount\""}
 
 [package.extras]
 headless-spec = ["PyYAML (>=6,<7)"]
@@ -966,6 +970,23 @@ files = [
 ]
 
 [[package]]
+name = "oauthlib"
+version = "3.3.1"
+description = "A generic, spec-compliant, thorough implementation of the OAuth request-signing logic"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "oauthlib-3.3.1-py3-none-any.whl", hash = "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1"},
+    {file = "oauthlib-3.3.1.tar.gz", hash = "sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9"},
+]
+
+[package.extras]
+rsa = ["cryptography (>=3.0.0)"]
+signals = ["blinker (>=1.4.0)"]
+signedtoken = ["cryptography (>=3.0.0)", "pyjwt (>=2.0.0,<3)"]
+
+[[package]]
 name = "packaging"
 version = "25.0"
 description = "Core utilities for Python packages"
@@ -1154,6 +1175,9 @@ files = [
     {file = "PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb"},
     {file = "pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953"},
 ]
+
+[package.dependencies]
+cryptography = {version = ">=3.4.0", optional = true, markers = "extra == \"crypto\""}
 
 [package.extras]
 crypto = ["cryptography (>=3.4.0)"]
@@ -1607,4 +1631,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "319569803b033cab749fbee7b7cb3b4c85ca8a523141f66e7410d95995032bd4"
+content-hash = "056d829f5a559e23256774b75528ddd66c4c3cc2ed9f362e973c6a948242f7e3"
