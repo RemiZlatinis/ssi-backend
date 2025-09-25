@@ -626,6 +626,26 @@ django = ">=4.2.9"
 sqlparse = ">=0.2"
 
 [[package]]
+name = "django-health-check"
+version = "3.20.0"
+description = "Monitor the health of your Django app and its connected services."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "django_health_check-3.20.0-py3-none-any.whl", hash = "sha256:bcb2b8f36f463cead0564a028345c5b17e2a2d18e9cc88ecd611b13a26521926"},
+    {file = "django_health_check-3.20.0.tar.gz", hash = "sha256:cd69ac5facf73fe7241d9492d939b57bd20e24f46c4edea91e6a900bf22c2d8e"},
+]
+
+[package.dependencies]
+Django = ">=4.2"
+
+[package.extras]
+docs = ["sphinx"]
+lint = ["ruff (==0.11.13)"]
+test = ["boto3", "celery", "django-storages", "pytest", "pytest-cov", "pytest-django", "redis"]
+
+[[package]]
 name = "django-ratelimit"
 version = "4.1.0"
 description = "Cache-based rate-limiting for Django."
@@ -1631,4 +1651,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "056d829f5a559e23256774b75528ddd66c4c3cc2ed9f362e973c6a948242f7e3"
+content-hash = "39a2f190982c1d6e6385aab22f245dcb37d96a9784f8f5746c18adb271dfbd6b"

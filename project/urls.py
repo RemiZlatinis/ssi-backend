@@ -23,4 +23,6 @@ urlpatterns = [
     path("api/auth/", include("authentication.urls")),
     # Notification endpoints
     path("api/notifications/", include("notifications.urls")),
+    # Health check
+    path("api/health/", include("health_check.urls")),
 ]
