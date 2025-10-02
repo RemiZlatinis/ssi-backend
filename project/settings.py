@@ -24,14 +24,12 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 DEBUG = False
 
 ALLOWED_HOSTS = ["127.0.0.1"]
-host_env = os.getenv("HOST")
-if host_env:
-    ALLOWED_HOSTS.append(host_env)
+if host_env := os.getenv("HOST"):
+    ALLOWED_HOSTS.extend([h.strip() for h in host_env.split(",")])
 
 CORS_ALLOWED_ORIGINS = []
-CORS_ALLOWED_ORIGINS_ENV = os.getenv("CORS_ALLOWED_ORIGINS")
-if CORS_ALLOWED_ORIGINS_ENV:
-    CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS_ENV.split(",")
+if cors_env := os.getenv("CORS_ALLOWED_ORIGINS"):
+    CORS_ALLOWED_ORIGINS.extend([o.strip() for o in cors_env.split(",")])
 
 INSTALLED_APPS = [
     # Priority apps
