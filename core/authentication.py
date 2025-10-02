@@ -34,7 +34,6 @@ class AgentAuthentication(BaseAuthentication):
 
         # Update IP address on successful authentication
         current_ip = get_client_ip(request)
-        print(agent.ip_address, current_ip)
         if agent.ip_address != current_ip:
             agent.ip_address = current_ip
             agent.save(update_fields=["ip_address"])
