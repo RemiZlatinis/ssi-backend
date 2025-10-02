@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from typing import Any
 
@@ -10,6 +11,8 @@ from notifications.models import Device
 
 from .models import Agent, Service
 from .utils import get_client_ip
+
+logger = logging.getLogger(__name__)
 
 
 class AgentConsumer(AsyncWebsocketConsumer):
@@ -29,7 +32,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             self.scope.get("url_route", {}).get("kwargs", {}).get("agent_key")
         )
         if not agent_key_str:
-            print("Connection attempt with missing agent_key in URL.")
+            logger.warning("Connection attempt with missing agent_key in URL.")
             await self.close()
             return
 
@@ -37,7 +40,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
             self.agent_key = uuid.UUID(agent_key_str)
         except (ValueError, TypeError):
             # The provided key is not a valid UUID (e.g., "None").
-            print(f"Connection attempt with invalid key format: {agent_key_str}")
+            logger.warning(
+                f"Connection attempt with invalid key format: {agent_key_str}"
+            )
             await self.close()
             return
 
@@ -48,7 +53,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             # get_agent() already prints a message.
             await self.close()
         else:
-            print(f"Agent '{self.agent.name}' connected successfully.")
+            logger.info(f"Agent '{self.agent.name}' connected successfully.")
             await self.accept()
             await self._increment_connections_and_set_online()
 
@@ -78,7 +83,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         Called when the WebSocket connection is closed.
         """
         if hasattr(self, "agent") and self.agent:
-            print(f"Agent '{self.agent.name}' disconnected.")
+            logger.info(f"Agent '{self.agent.name}' disconnected.")
             await self._decrement_connections_and_set_offline()
             if hasattr(self, "channel_layer") and self.channel_layer:
                 # Discard from agent-specific group
@@ -89,7 +94,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 # Broadcast the offline status to the user's group
                 await self._broadcast_agent_status(is_online=False)
         else:
-            print("An unauthenticated agent disconnected.")
+            logger.info("An unauthenticated agent disconnected.")
 
     async def receive(
         self, text_data: str | None = None, bytes_data: bytes | None = None
@@ -117,12 +122,16 @@ class AgentConsumer(AsyncWebsocketConsumer):
             elif event_type == "status_update":
                 await self._handle_status_update(data)
             else:
-                print(f"Received unknown event type: {event_type}")
+                logger.warning(f"Received unknown event type: {event_type}")
 
         except json.JSONDecodeError:
-            print(f"Received non-JSON message from {self.agent.name}: {text_data}")
+            logger.warning(
+                f"Received non-JSON message from {self.agent.name}: {text_data}"
+            )
         except Exception as e:
-            print(f"Error processing message from {self.agent.name}: {e}")
+            logger.error(
+                f"Error processing message from {self.agent.name}: {e}", exc_info=True
+            )
 
     # --- Event Handlers ---
 
@@ -133,7 +142,9 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """
         if not self.agent:
             return
-        print(f"Forcibly disconnecting agent {self.agent.name} due to unregistration.")
+        logger.info(
+            f"Forcibly disconnecting agent {self.agent.name} due to unregistration."
+        )
         # 4001 is a custom code indicating the agent was unregistered.
         await self.close(code=4001)
 
@@ -141,7 +152,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """Synchronizes all services from the agent with the database."""
         if not self.agent:
             return
-        print(f"Processing 'agent_hello' from {self.agent.name}")
+        logger.info(f"Processing 'agent_hello' from {self.agent.name}")
         services_info = event_data.get("services", [])
         await self.sync_services_db(self.agent, services_info)
 
@@ -149,7 +160,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """Adds a single new service to the database."""
         service_info = event_data.get("service")
         if service_info:
-            print(f"Processing 'service_added' for {service_info.get('name')}")
+            logger.info(f"Processing 'service_added' for {service_info.get('name')}")
             await self.add_or_update_service_db(self.agent, service_info)
             # After adding/updating service, broadcast an update to the user's group
             await self._broadcast_service_added(service_info)
@@ -158,7 +169,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """Removes a single service from the database."""
         service_id = event_data.get("service_id")
         if service_id:
-            print(f"Processing 'service_removed' for ID {service_id}")
+            logger.info(f"Processing 'service_removed' for ID {service_id}")
             await self.remove_service_db(self.agent, service_id)
             # After removing service, broadcast an update to the user's group
             await self._broadcast_service_removed(service_id)
@@ -167,7 +178,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """Updates the status of a single service."""
         update = event_data.get("update")
         if update:
-            print(
+            logger.info(
                 f"Processing 'status_update' for service ID {update.get('service_id')}"
             )
             await self.update_service_status_db(self.agent, update)
@@ -252,7 +263,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             return
         self.agent.ip_address = new_ip
         self.agent.save(update_fields=["ip_address"])
-        print(f"Updated IP address for agent '{self.agent.name}' to {new_ip}")
+        logger.info(f"Updated IP address for agent '{self.agent.name}' to {new_ip}")
 
     async def _check_and_update_agent_ip(self) -> None:
         """
@@ -386,8 +397,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
             # This will now correctly trigger the pre_save and post_save signals.
             service.save(update_fields=["last_status", "last_message", "last_seen"])
         except Service.DoesNotExist:
-            print(
-                f"Warning: Received status update for unknown service ID "
+            logger.warning(
+                f"Received status update for unknown service ID "
                 f"{update_data.get('service_id')} from agent {agent.name}"
             )
 
@@ -406,5 +417,5 @@ class AgentConsumer(AsyncWebsocketConsumer):
                 key=key, registration_status=Agent.RegistrationStatus.REGISTERED
             )
         except Agent.DoesNotExist:
-            print(f"Connection attempt with invalid agent key: {key}")
+            logger.warning(f"Connection attempt with invalid agent key: {key}")
             return None

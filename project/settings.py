@@ -8,6 +8,8 @@ from typing import Any, cast
 import dj_database_url
 from dotenv import load_dotenv
 
+from .log import LOGGING  # noqa: F401
+
 # Load environment variables from .env file
 load_dotenv()
 
