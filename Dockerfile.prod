@@ -56,6 +56,9 @@ COPY . .
 # Make entrypoint script executable
 RUN chmod +x /app/entrypoint.prod.sh
 
+# Create the directory for logs
+RUN mkdir -p /app/logs
+
 # Collect static files during build
 RUN python manage.py collectstatic --noinput
 

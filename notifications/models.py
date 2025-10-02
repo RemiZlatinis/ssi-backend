@@ -8,7 +8,7 @@ from requests.exceptions import ConnectionError, HTTPError
 
 User = get_user_model()
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("notifications")
 
 
 class Device(models.Model):
@@ -87,6 +87,7 @@ class Device(models.Model):
                     ],
                 )
                 result: dict[str, Any] = response.json()
+                logger.info(f"Notification sent to device {self.id}: {result}")
                 return result
         except (HTTPError, ConnectionError) as e:
             logger.error(f"Error sending notification to device {self.id}: {e}")

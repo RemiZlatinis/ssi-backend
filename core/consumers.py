@@ -12,7 +12,7 @@ from notifications.models import Device
 from .models import Agent, Service
 from .utils import get_client_ip
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("core")
 
 
 class AgentConsumer(AsyncWebsocketConsumer):
