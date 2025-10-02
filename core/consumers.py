@@ -6,6 +6,8 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.db import transaction
 
+from notifications.models import Device
+
 from .models import Agent, Service
 from .utils import get_client_ip
 
@@ -280,6 +282,16 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         else ["active_connections"]
                     )
                 )
+                # Send notification if agent came online
+                if was_offline and agent.owner:
+                    user = agent.owner
+                    user_devices = Device.objects.filter(
+                        user=user, status=Device.STATUS_ACTIVE
+                    )
+                    for device in user_devices:
+                        device.send_notification(
+                            title=f"Agent '{agent.name}' is now online"
+                        )
 
     @database_sync_to_async
     def _decrement_connections_and_set_offline(self) -> None:
@@ -299,6 +311,16 @@ class AgentConsumer(AsyncWebsocketConsumer):
                         else ["active_connections"]
                     )
                 )
+                # Send notification if agent went offline
+                if agent.active_connections == 0 and agent.owner:
+                    user = agent.owner
+                    user_devices = Device.objects.filter(
+                        user=user, status=Device.STATUS_ACTIVE
+                    )
+                    for device in user_devices:
+                        device.send_notification(
+                            title=f"Agent '{agent.name}' is now offline"
+                        )
 
     @database_sync_to_async
     def sync_services_db(

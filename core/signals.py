@@ -3,7 +3,7 @@ from typing import Any
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
-from core.models import Agent, Service
+from core.models import Service
 from notifications.models import Device
 
 
@@ -51,51 +51,4 @@ def post_save_service_status(
                     device.send_notification(
                         title=f"{instance.name} - {new_status}",
                         body=instance.last_message,
-                    )
-
-
-@receiver(pre_save, sender=Agent)
-def pre_save_agent_is_online(
-    sender: type[Agent], instance: Agent, **kwargs: Any
-) -> None:
-    """
-    Stores the original 'is_online' status of an Agent instance before it's saved.
-    This allows the post_save signal to compare old and new values.
-    """
-    if not instance._state.adding:
-        try:
-            original_agent = Agent.objects.only("is_online").get(pk=instance.pk)
-            instance.__setattr__("_original_is_online", original_agent.is_online)
-        except Agent.DoesNotExist:
-            # This can happen in a race condition. Set original status to None
-            # so the post_save check will treat it as a change.
-            instance.__setattr__("_original_is_online", None)
-
-
-@receiver(post_save, sender=Agent)
-def post_save_agent_is_online(
-    sender: type[Agent],
-    instance: Agent,
-    created: bool,
-    update_fields: set[str] | None,
-    **kwargs: Any,
-) -> None:
-    """
-    Sends a notification when the 'is_online' status of an Agent changes.
-    """
-    # Check if the instance was not just created
-    # and 'is_online' was among the updated fields
-    if not created and update_fields and "is_online" in update_fields:
-        old_status = getattr(instance, "_original_is_online", None)
-        new_status = instance.is_online
-        if old_status != new_status:
-            if instance.owner:
-                user = instance.owner
-                user_devices = Device.objects.filter(
-                    user=user, status=Device.STATUS_ACTIVE
-                )
-                status_text = "online" if new_status else "offline"
-                for device in user_devices:
-                    device.send_notification(
-                        title=f"Agent '{instance.name}' is now {status_text}",
                     )
