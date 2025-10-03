@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:dbbackup_admin_backup_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {% trans 'Restore Backup' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>{% trans 'Restore Database Backup' %}</h1>
+
+<div class="module" style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin-bottom: 20px;">
+    <h2 style="color: #856404; margin-top: 0;">{% trans 'Warning!' %}</h2>
+    <p style="color: #856404; margin-bottom: 0;">{% trans 'This will overwrite your current database and cannot be undone. Make sure you have a backup of your current data before proceeding.' %}</p>
+</div>
+
+<p>{% trans 'Are you sure you want to restore the database from this backup?' %}</p>
+
+<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
+    <tr style="border-bottom: 1px solid #ddd;">
+        <th style="text-align: left; padding: 8px; background-color: #f5f5f5;">{% trans 'Backup Name' %}</th>
+        <td style="padding: 8px;">{{ backup.file_path }}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #ddd;">
+        <th style="text-align: left; padding: 8px; background-color: #f5f5f5;">{% trans 'Type' %}</th>
+        <td style="padding: 8px;">{% if backup.backup_type == 'db' %}{% trans 'Database' %}{% else %}{% trans 'Media' %}{% endif %}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #ddd;">
+        <th style="text-align: left; padding: 8px; background-color: #f5f5f5;">{% trans 'Created' %}</th>
+        <td style="padding: 8px;">{{ backup.created_at }}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #ddd;">
+        <th style="text-align: left; padding: 8px; background-color: #f5f5f5;">{% trans 'File Size' %}</th>
+        <td style="padding: 8px;">{{ backup.get_size_display }}</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #ddd;">
+        <th style="text-align: left; padding: 8px; background-color: #f5f5f5;">{% trans 'Status' %}</th>
+        <td style="padding: 8px;">{{ backup.get_status_display }}</td>
+    </tr>
+</table>
+
+<form method="post" data-confirm="{% trans 'Are you absolutely sure you want to restore this backup? This action cannot be undone.'|escapejs %}">
+{% csrf_token %}
+<input type="submit" value="{% trans 'Restore Backup' %}" class="default" style="background-color: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+<a href="{% url 'admin:dbbackup_admin_backup_changelist' %}" class="button" style="margin-left: 10px; padding: 8px 16px; text-decoration: none; border-radius: 4px;">{% trans 'Cancel' %}</a>
+</form>
+<script>
+document.querySelector('form[data-confirm]').addEventListener('submit', function(e) {
+    if (!confirm(this.dataset.confirm)) {
+        e.preventDefault();
+    }
+});
+</script>
+{% endblock %}

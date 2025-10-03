@@ -81,6 +81,11 @@ LOGGING = {
             "level": LOG_LEVEL,
             "propagate": False,
         },
+        "dbbackup_admin": {
+            "handlers": ["console", "file"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
     },
 }
 

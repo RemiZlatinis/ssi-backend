@@ -1,0 +1,23 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+        &rsaquo; <a href="{% url 'admin:app_list' app_label='dbbackup_admin' %}">{% trans 'Dbbackup Admin' %}</a>
+        &rsaquo; <a href="{% url 'admin:dbbackup_admin_backup_changelist' %}">{% trans 'Backups' %}</a>
+        &rsaquo; {% trans 'Sync Backups' %}
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div id="content-main">
+        <form action="" method="post">
+            {% csrf_token %}
+            <p>{% trans "Are you sure you want to sync backups? This will update the database with existing backup files." %}</p>
+            <div class="submit-row">
+                <input type="submit" value="{% trans 'Sync' %}" class="default" name="sync">
+            </div>
+        </form>
+    </div>
+{% endblock %}

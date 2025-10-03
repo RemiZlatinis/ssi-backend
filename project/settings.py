@@ -57,10 +57,12 @@ INSTALLED_APPS = [
     "health_check.db",
     "health_check.cache",
     "health_check.contrib.migrations",
+    "dbbackup",
     # Project
     "core",
     "notifications",
     "authentication",
+    "dbbackup_admin",
 ]
 
 MIDDLEWARE = [
@@ -144,6 +146,12 @@ TEMPLATES = [
 STORAGES = {
     "staticfiles": {
         "BACKEND": "servestatic.storage.CompressedManifestStaticFilesStorage",
+    },
+    "dbbackup": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "OPTIONS": {
+            "location": BASE_DIR / "backups",
+        },
     },
 }
 

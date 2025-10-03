@@ -610,6 +610,21 @@ asgiref = ">=3.6"
 django = ">=4.2"
 
 [[package]]
+name = "django-dbbackup"
+version = "5.0.0"
+description = "Management commands to help backup and restore a project database and media."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "django_dbbackup-5.0.0-py3-none-any.whl", hash = "sha256:a0301b14a4bb3c7243a2fde76d09f8f572f16cd7639f75f4cd42d898fc1b82a2"},
+    {file = "django_dbbackup-5.0.0.tar.gz", hash = "sha256:aa9cc88e1413adfec0e547dd91e0afed6dbb91a02459697663a9b988dbc71f18"},
+]
+
+[package.dependencies]
+django = ">=4.2"
+
+[[package]]
 name = "django-debug-toolbar"
 version = "6.0.0"
 description = "A configurable set of panels that display various debug information about the current request/response."
@@ -1709,4 +1724,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "e76f63f0c36cbe8b9d260570ce2d656b40ba9bb1d53602b66410099bbe93b5e8"
+content-hash = "76e47044ac355646ccdff5c648cf0b3ae551c69b46c2a97b0b1d8b44be228ed1"

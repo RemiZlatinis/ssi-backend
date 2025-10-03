@@ -1,0 +1,31 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:dbbackup_admin_backup_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {% trans 'Create Backup' %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>{% trans 'Create Database Backup' %}</h1>
+
+<p>{% trans 'Select the type of backup you want to create:' %}</p>
+<p>{% trans 'This process may take a few minutes depending on the size of your database.' %}</p>
+
+<form method="post">
+{% csrf_token %}
+<div class="form-row">
+    <div>
+        <label for="id_backup_type_0" style="display: block; margin-bottom: 10px; font-weight: bold;">{% trans 'Backup Type:' %}</label>
+        {{ form.backup_type }}
+    </div>
+</div>
+<br>
+<input type="submit" value="{% trans 'Create Backup' %}" class="default" style="background-color: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+<a href="{% url 'admin:dbbackup_admin_backup_changelist' %}" class="button" style="margin-left: 10px; padding: 8px 16px; text-decoration: none; border-radius: 4px;">{% trans 'Cancel' %}</a>
+</form>
+{% endblock %}
