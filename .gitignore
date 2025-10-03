@@ -35,3 +35,7 @@ media/
 
 # Ruff
 .ruff_cache
+
+# Project needed dirs but ignore their content
+logs/*
+backups/*
