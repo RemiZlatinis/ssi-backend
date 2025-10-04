@@ -1,8 +1,6 @@
-import glob
-import os
 import re
 
-from django.conf import settings
+from django.core.files.storage import storages
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -13,32 +11,30 @@ class Command(BaseCommand):
     help = "Sync existing backup files with the database"
 
     def handle(self, *args, **options):
+        storage = storages["dbbackup"]
         try:
-            backup_dir = settings.STORAGES["dbbackup"]["OPTIONS"]["location"]
-        except KeyError:
+            _, all_files = storage.listdir("")
+        except Exception as e:
             self.stderr.write(
-                self.style.ERROR(
-                    "Missing required setting: STORAGES['dbbackup']['OPTIONS']"
-                    "['location']"
-                )
+                self.style.ERROR(f"Could not list files from storage: {e}")
             )
             return
 
-        # Look for database backup files
-        db_pattern = os.path.join(backup_dir, "*.psql.bin")
-        media_pattern = os.path.join(backup_dir, "*.tar")
+        # Filter files for database and media backups
+        db_files = [f for f in all_files if f.endswith(".psql.bin")]
+        media_files = [f for f in all_files if f.endswith(".tar")]
 
         created_count = 0
         updated_count = 0
 
         # Process database backups
-        db_created, db_updated = self._process_backup_files(db_pattern, "db")
+        db_created, db_updated = self._process_backup_files(storage, db_files, "db")
         created_count += db_created
         updated_count += db_updated
 
         # Process media backups
         media_created, media_updated = self._process_backup_files(
-            media_pattern, "media"
+            storage, media_files, "media"
         )
         created_count += media_created
         updated_count += media_updated
@@ -49,14 +45,12 @@ class Command(BaseCommand):
             )
         )
 
-    def _process_backup_files(self, pattern, backup_type):
-        """Process backup files matching the given pattern."""
+    def _process_backup_files(self, storage, files, backup_type):
+        """Process backup files from storage."""
         created_count = 0
         updated_count = 0
 
-        for file_path in glob.glob(pattern):
-            filename = os.path.basename(file_path)
-
+        for filename in files:
             # Parse filename to extract information
             # Expected format for db: {database}-{hash}-{timestamp}.psql.bin
             # Expected format for media: {timestamp}.tar
@@ -65,7 +59,7 @@ class Command(BaseCommand):
                     r"(.+)-(.+)-(\d{4}-\d{2}-\d{2}-\d{6})\.psql\.bin", filename
                 )
                 if match:
-                    database_name, hash_part, timestamp_str = match.groups()
+                    _, _, timestamp_str = match.groups()
 
                     # Parse timestamp
                     timestamp = timezone.datetime.strptime(
@@ -73,11 +67,11 @@ class Command(BaseCommand):
                     )
                     timestamp = timezone.make_aware(timestamp)
 
-                    # Get file size
-                    file_size = os.path.getsize(file_path)
+                    # Get file size from storage
+                    file_size = storage.size(filename)
 
                     # Check if backup already exists
-                    backup, created = Backup.objects.get_or_create(
+                    _, created = Backup.objects.get_or_create(
                         file_path=filename,
                         defaults={
                             "backup_type": backup_type,
@@ -94,27 +88,23 @@ class Command(BaseCommand):
                             self.style.SUCCESS(f"Created backup record: {filename}")
                         )
                     else:
+                        # If you want to update existing records, add logic here
                         updated_count += 1
-                        self.stdout.write(
-                            self.style.SUCCESS(f"Updated backup record: {filename}")
-                        )
             else:  # media backup
                 try:
-                    # For media backups, we'll use the file modification time
-                    mod_time = os.path.getmtime(file_path)
-                    timestamp = timezone.datetime.fromtimestamp(mod_time)
-                    timestamp = timezone.make_aware(timestamp)
+                    # For media backups, use the file modification time from storage
+                    timestamp = storage.get_modified_time(filename)
 
-                    # Get file size
-                    file_size = os.path.getsize(file_path)
-                except OSError as e:
+                    # Get file size from storage
+                    file_size = storage.size(filename)
+                except (OSError, NotImplementedError) as e:
                     self.stderr.write(
                         self.style.WARNING(f"Error processing {filename}: {e}")
                     )
                     continue
 
                 # Check if backup already exists
-                backup, created = Backup.objects.get_or_create(
+                _, created = Backup.objects.get_or_create(
                     file_path=filename,
                     defaults={
                         "backup_type": backup_type,
@@ -131,8 +121,6 @@ class Command(BaseCommand):
                         self.style.SUCCESS(f"Created backup record: {filename}")
                     )
                 else:
+                    # If you want to update existing records, add logic here
                     updated_count += 1
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Updated backup record: {filename}")
-                    )
         return created_count, updated_count

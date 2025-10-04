@@ -236,5 +236,36 @@ elif ENVIRONMENT == "production":
             "CONFIG": {"hosts": [os.environ.get("REDIS_URL")]},
         },
     }
+
+    if os.getenv("AWS_STORAGE_BUCKET_NAME"):
+        _AWS_S3_ACCESS_KEY_ID = os.getenv("AWS_S3_ACCESS_KEY_ID")
+        _AWS_S3_SECRET_ACCESS_KEY = os.getenv("AWS_S3_SECRET_ACCESS_KEY")
+        _AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
+        _AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL")
+
+        if not all(
+            [
+                _AWS_S3_ACCESS_KEY_ID,
+                _AWS_S3_SECRET_ACCESS_KEY,
+                _AWS_S3_REGION_NAME,
+                _AWS_S3_ENDPOINT_URL,
+            ]
+        ):
+            raise ValueError(
+                "All AWS S3 environment variables (AWS_S3_ACCESS_KEY_ID, "
+                "AWS_S3_SECRET_ACCESS_KEY, AWS_S3_REGION_NAME, "
+                "AWS_S3_ENDPOINT_URL) must be set for S3 backups."
+            )
+
+        STORAGES["dbbackup"] = {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "access_key": _AWS_S3_ACCESS_KEY_ID,
+                "secret_key": _AWS_S3_SECRET_ACCESS_KEY,
+                "bucket_name": os.getenv("AWS_STORAGE_BUCKET_NAME"),
+                "region_name": _AWS_S3_REGION_NAME,
+                "endpoint_url": _AWS_S3_ENDPOINT_URL,
+            },
+        }
 else:
     raise ValueError(f"Invalid ENVIRONMENT value: {ENVIRONMENT}")

@@ -25,6 +25,7 @@ dependencies = [
     "django-health-check (>=3.20.0,<4.0.0)",
     "sentry-sdk (>=2.39.0,<3.0.0)",
     "django-dbbackup (>=5.0.0,<6.0.0)",
+    "django-storages[s3] (>=1.14.6,<2.0.0)",
 ]
 
 [tool.poetry]

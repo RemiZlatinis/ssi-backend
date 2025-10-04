@@ -1,11 +1,10 @@
-import glob
 import logging
 import os
 import subprocess
 
 from django import forms
-from django.conf import settings
 from django.contrib import admin
+from django.core.files.storage import storages
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -234,10 +233,9 @@ class BackupAdmin(admin.ModelAdmin):
 
         if request.method == "POST":
             try:
-                # Run the dbrestore command
-                backup_dir = settings.STORAGES["dbbackup"]["OPTIONS"]["location"]
-                full_file_path = os.path.join(backup_dir, backup.file_path)
-
+                # Run the dbrestore command with the relative file path.
+                # django-dbbackup will use the configured storage backend to find the
+                # file.
                 if backup.backup_type == "db":
                     result = subprocess.run(
                         [
@@ -246,7 +244,7 @@ class BackupAdmin(admin.ModelAdmin):
                             "dbrestore",
                             "--noinput",
                             "--input-filename",
-                            full_file_path,
+                            backup.file_path,
                         ],
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         capture_output=True,
@@ -261,7 +259,7 @@ class BackupAdmin(admin.ModelAdmin):
                             "mediarestore",
                             "--noinput",
                             "--input-filename",
-                            full_file_path,
+                            backup.file_path,
                         ],
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         capture_output=True,
@@ -350,10 +348,9 @@ class BackupAdmin(admin.ModelAdmin):
             )
 
         try:
-            backup_dir = settings.STORAGES["dbbackup"]["OPTIONS"]["location"]
-            file_path = os.path.join(backup_dir, backup.file_path)
-
-            with open(file_path, "rb") as file:
+            # Use the storage API to open and read the file for download
+            storage = storages["dbbackup"]
+            with storage.open(backup.file_path, "rb") as file:
                 response = HttpResponse(
                     file.read(), content_type="application/octet-stream"
                 )
@@ -370,26 +367,30 @@ class BackupAdmin(admin.ModelAdmin):
             )
 
     def _update_backup_with_latest_file(self, backup, backup_type):
-        """Update backup record with the latest file information."""
+        """
+        Update backup record with the latest file information using the storage API.
+        """
         try:
-            backup_dir = settings.STORAGES["dbbackup"]["OPTIONS"]["location"]
+            storage = storages["dbbackup"]
+            # List files from the root of the storage
+            _, files = storage.listdir("")
 
-            # Get the latest backup file
+            # Filter files based on backup type
             if backup_type == "db":
-                pattern = os.path.join(backup_dir, "*.psql.bin")
+                backup_files = [f for f in files if f.endswith(".psql.bin")]
             else:
-                pattern = os.path.join(backup_dir, "*.tar")
-
-            backup_files = glob.glob(pattern)
+                backup_files = [f for f in files if f.endswith(".tar")]
 
             if backup_files:
-                # Sort by modification time and get the latest
-                backup_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+                # Sort by modification time using the storage API
+                backup_files.sort(
+                    key=lambda f: storage.get_modified_time(f), reverse=True
+                )
                 latest_file = backup_files[0]
 
-                # Store just the filename, not the full path
-                backup.file_path = os.path.basename(latest_file)
-                backup.size = os.path.getsize(latest_file)
+                # Update the backup record with file info from storage
+                backup.file_path = latest_file
+                backup.size = storage.size(latest_file)
                 backup.save()
         except Exception as e:
             # If we can't find the file, leave the backup as is
