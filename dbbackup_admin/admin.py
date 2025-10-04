@@ -219,7 +219,7 @@ class BackupAdmin(admin.ModelAdmin):
                     command == "dbrestore"
                     and os.environ.get("ALLOW_RESTORE_FROM_OTHER_DB") == "True"
                 ):
-                    kwargs["pg_options"] = "--no-owner"
+                    kwargs["pg_options"] = "--no-owner --no-privileges"
 
                 call_command(command, **kwargs)
 
