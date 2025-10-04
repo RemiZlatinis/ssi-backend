@@ -200,6 +200,11 @@ CHANNEL_LAYERS = {
     },
 }
 
+# django-dbbackup
+if os.environ.get("ALLOW_RESTORE_FROM_OTHER_DB", False) == "True":
+    DBBACKUP_RESTORE_OPTIONS = {
+        "default": ["--no-owner"],
+    }
 
 ###############################################
 # SETTINGS OVERRIDES based on the environment #

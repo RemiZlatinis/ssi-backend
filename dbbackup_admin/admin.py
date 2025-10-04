@@ -1,10 +1,11 @@
+import io
 import logging
 import os
-import subprocess
 
 from django import forms
 from django.contrib import admin
 from django.core.files.storage import storages
+from django.core.management import CommandError, call_command
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -143,62 +144,32 @@ class BackupAdmin(admin.ModelAdmin):
         """View to create a new backup."""
         if request.method == "POST":
             backup_type = request.POST.get("backup_type", "db")
-
-            # Create a new backup record
             backup = Backup.objects.create(backup_type=backup_type, status="pending")
+            output = io.StringIO()
 
             try:
-                # Run the backup command
-                if backup_type == "db":
-                    result = subprocess.run(
-                        ["python", "manage.py", "dbbackup"],
-                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        capture_output=True,
-                        text=True,
-                        timeout=300,  # 5 minutes timeout
-                    )
-                else:
-                    result = subprocess.run(
-                        ["python", "manage.py", "mediabackup"],
-                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        capture_output=True,
-                        text=True,
-                        timeout=300,  # 5 minutes timeout
-                    )
+                command = "dbbackup" if backup_type == "db" else "mediabackup"
+                call_command(command, stdout=output, stderr=output)
 
-                if result.returncode == 0:
-                    # Find the latest backup file created
-                    self._update_backup_with_latest_file(backup, backup_type)
-                    backup.status = "completed"
-                    backup.completed_at = timezone.now()
-                    backup.save()
-
-                    self.message_user(
-                        request,
-                        f"Backup created successfully: {backup.file_path}",
-                    )
-                else:
-                    backup.status = "failed"
-                    backup.save()
-                    self.message_user(
-                        request,
-                        "Backup creation failed. Check server logs for details.",
-                        level="error",
-                    )
-            except subprocess.TimeoutExpired:
-                backup.status = "failed"
+                # Find the latest backup file created
+                self._update_backup_with_latest_file(backup, backup_type)
+                backup.status = "completed"
+                backup.completed_at = timezone.now()
                 backup.save()
+
                 self.message_user(
                     request,
-                    "Backup creation timed out after 5 minutes.",
-                    level="error",
+                    f"Backup created successfully: {backup.file_path}",
                 )
-            except Exception as e:
+            except (CommandError, Exception) as e:
                 backup.status = "failed"
                 backup.save()
+                output.seek(0)
+                result_output = output.read()
+                logger.error(f"Backup creation failed: {e}\nOutput:\n{result_output}")
                 self.message_user(
                     request,
-                    f"Backup creation failed: {str(e)}",
+                    "Backup creation failed. Check server logs for details.",
                     level="error",
                 )
 
@@ -232,58 +203,28 @@ class BackupAdmin(admin.ModelAdmin):
         backup = Backup.objects.get(id=backup_id)
 
         if request.method == "POST":
+            output = io.StringIO()
             try:
-                # Run the dbrestore command with the relative file path.
-                # django-dbbackup will use the configured storage backend to find the
-                # file.
-                if backup.backup_type == "db":
-                    result = subprocess.run(
-                        [
-                            "python",
-                            "manage.py",
-                            "dbrestore",
-                            "--noinput",
-                            "--input-filename",
-                            backup.file_path,
-                        ],
-                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        capture_output=True,
-                        text=True,
-                        timeout=300,  # 5 minutes timeout
-                    )
-                else:
-                    result = subprocess.run(
-                        [
-                            "python",
-                            "manage.py",
-                            "mediarestore",
-                            "--noinput",
-                            "--input-filename",
-                            backup.file_path,
-                        ],
-                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        capture_output=True,
-                        text=True,
-                        timeout=300,  # 5 minutes timeout
-                    )
-
-                if result.returncode == 0:
-                    self.message_user(
-                        request,
-                        f"Backup restored successfully from: {backup.file_path}",
-                    )
-                else:
-                    self.message_user(
-                        request, f"Restore failed: {result.stderr}", level="error"
-                    )
-            except subprocess.TimeoutExpired:
+                command = "dbrestore" if backup.backup_type == "db" else "mediarestore"
+                call_command(
+                    command,
+                    "--noinput",
+                    "--input-filename",
+                    backup.file_path,
+                    stdout=output,
+                    stderr=output,
+                )
                 self.message_user(
                     request,
-                    "Database restore timed out after 5 minutes.",
-                    level="error",
+                    f"Backup restored successfully from: {backup.file_path}",
                 )
-            except Exception as e:
-                self.message_user(request, f"Restore failed: {str(e)}", level="error")
+            except (CommandError, Exception) as e:
+                output.seek(0)
+                result_output = output.read()
+                logger.error(f"Restore failed: {e}\nOutput:\n{result_output}")
+                self.message_user(
+                    request, f"Restore failed: {result_output}", level="error"
+                )
 
             return HttpResponseRedirect(
                 reverse("admin:dbbackup_admin_backup_changelist")
@@ -302,28 +243,17 @@ class BackupAdmin(admin.ModelAdmin):
     def sync_backups_view(self, request):
         """View to sync backups with the database."""
         if request.method == "POST":
+            output = io.StringIO()
             try:
-                result = subprocess.run(
-                    ["python", "manage.py", "sync_backups"],
-                    cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                    capture_output=True,
-                    text=True,
-                    timeout=300,  # 5 minutes timeout
-                )
+                call_command("sync_backups", stdout=output, stderr=output)
+                self.message_user(request, "Backups synced successfully!")
 
-                if result.returncode == 0:
-                    self.message_user(request, "Backups synced successfully!")
-                else:
-                    self.message_user(
-                        request, f"Backup sync failed: {result.stderr}", level="error"
-                    )
-            except subprocess.TimeoutExpired:
+            except (CommandError, Exception) as e:
+                output.seek(0)
+                result_output = output.read()
+                logger.error(f"Backup sync failed: {e}\nOutput:\n{result_output}")
                 self.message_user(
-                    request, "Backup sync timed out after 5 minutes.", level="error"
-                )
-            except Exception as e:
-                self.message_user(
-                    request, f"Backup sync failed: {str(e)}", level="error"
+                    request, f"Backup sync failed: {result_output}", level="error"
                 )
 
             return HttpResponseRedirect(
