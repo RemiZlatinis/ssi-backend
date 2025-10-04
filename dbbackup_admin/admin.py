@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+import tempfile
 
 from django import forms
 from django.contrib import admin
@@ -205,27 +206,42 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method == "POST":
             output = io.StringIO()
             try:
-                command = "dbrestore" if backup.backup_type == "db" else "mediarestore"
-                kwargs = {
-                    "stdout": output,
-                    "stderr": output,
-                    "noinput": True,
-                    "input_filename": backup.file_path,
-                }
-                # Add pg_options only if restoring a PostgreSQL DB and the env
-                # var is set
-                if (
-                    command == "dbrestore"
-                    and os.environ.get("ALLOW_RESTORE_FROM_OTHER_DB") == "True"
-                ):
-                    kwargs["pg_options"] = "--no-owner"
+                # Download the backup file from S3 to a temporary local file
+                storage = storages["dbbackup"]
+                with storage.open(backup.file_path, "rb") as s3_file:
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".psql.bin"
+                    ) as temp_file:
+                        temp_file.write(s3_file.read())
+                        temp_path = temp_file.name
 
-                call_command(command, **kwargs)
+                try:
+                    command = (
+                        "dbrestore" if backup.backup_type == "db" else "mediarestore"
+                    )
+                    kwargs = {
+                        "stdout": output,
+                        "stderr": output,
+                        "noinput": True,
+                        "input_filename": temp_path,  # Use the local temp file path
+                    }
+                    # Add pg_options only if restoring a PostgreSQL DB and the env
+                    # var is set
+                    if (
+                        command == "dbrestore"
+                        and os.environ.get("ALLOW_RESTORE_FROM_OTHER_DB") == "True"
+                    ):
+                        kwargs["pg_options"] = "--no-owner"
 
-                self.message_user(
-                    request,
-                    f"Backup restored successfully from: {backup.file_path}",
-                )
+                    call_command(command, **kwargs)
+
+                    self.message_user(
+                        request,
+                        f"Backup restored successfully from: {backup.file_path}",
+                    )
+                finally:
+                    # Clean up the temporary file
+                    os.unlink(temp_path)
             except (CommandError, Exception) as e:
                 output.seek(0)
                 result_output = output.read()
