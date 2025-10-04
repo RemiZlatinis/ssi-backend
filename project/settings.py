@@ -201,11 +201,7 @@ CHANNEL_LAYERS = {
 }
 
 # django-dbbackup
-DBBACKUP_CONNECTORS = {
-    "default": {
-        "RESTORE_OPTIONS": ["--no-owner"],
-    },
-}
+
 
 ###############################################
 # SETTINGS OVERRIDES based on the environment #

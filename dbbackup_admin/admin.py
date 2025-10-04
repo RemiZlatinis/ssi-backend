@@ -206,14 +206,22 @@ class BackupAdmin(admin.ModelAdmin):
             output = io.StringIO()
             try:
                 command = "dbrestore" if backup.backup_type == "db" else "mediarestore"
-                call_command(
-                    command,
-                    "--noinput",
-                    "--input-filename",
-                    backup.file_path,
-                    stdout=output,
-                    stderr=output,
-                )
+                kwargs = {
+                    "stdout": output,
+                    "stderr": output,
+                    "noinput": True,
+                    "input_filename": backup.file_path,
+                }
+                # Add pg_options only if restoring a PostgreSQL DB and the env
+                # var is set
+                if (
+                    command == "dbrestore"
+                    and os.environ.get("ALLOW_RESTORE_FROM_OTHER_DB") == "True"
+                ):
+                    kwargs["pg_options"] = "--no-owner"
+
+                call_command(command, **kwargs)
+
                 self.message_user(
                     request,
                     f"Backup restored successfully from: {backup.file_path}",
