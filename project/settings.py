@@ -220,7 +220,7 @@ elif ENVIRONMENT == "production":
 
     host = os.getenv("HOST")
     if host:
-        CSRF_TRUSTED_ORIGINS = [f"https://{host}"]
+        CSRF_TRUSTED_ORIGINS = [f"https://{h.strip()}" for h in host.split(",")]
 
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
