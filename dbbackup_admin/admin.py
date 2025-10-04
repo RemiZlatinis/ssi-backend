@@ -210,6 +210,7 @@ class BackupAdmin(admin.ModelAdmin):
                     "stdout": output,
                     "stderr": output,
                     "noinput": True,
+                    "interactive": False,
                     "input_filename": backup.file_path,
                 }
                 # Add pg_options only if restoring a PostgreSQL DB and the env
