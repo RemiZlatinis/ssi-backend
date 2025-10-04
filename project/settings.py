@@ -201,9 +201,10 @@ CHANNEL_LAYERS = {
 }
 
 # django-dbbackup
-# if os.environ.get("ALLOW_RESTORE_FROM_OTHER_DB", False) == "True":
-DBBACKUP_RESTORE_OPTIONS = {
-    "default": ["--no-owner"],
+DBBACKUP_CONNECTORS = {
+    "default": {
+        "RESTORE_OPTIONS": ["--no-owner"],
+    },
 }
 
 ###############################################
