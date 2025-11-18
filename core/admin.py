@@ -58,4 +58,5 @@ class ServiceAdmin(admin.ModelAdmin):
     def has_delete_permission(
         self, request: HttpRequest, obj: Any | None = None
     ) -> bool:
-        return False
+        # return False
+        return True  # Allow manual agent deletion from the Admin panel
