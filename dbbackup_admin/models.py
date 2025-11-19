@@ -16,14 +16,15 @@ class Backup(models.Model):
     label = models.CharField(max_length=255, blank=True, default="")
     size = models.PositiveIntegerField(blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
-    created_at = models.DateTimeField(auto_now_add=True)
+    record_created_at = models.DateTimeField(auto_now_add=True)
+    backup_created_at = models.DateTimeField(blank=True, null=True)
     completed_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        ordering = ["-completed_at"]
+        ordering = ["-backup_created_at"]
 
     def __str__(self):
-        return f"{self.backup_type} backup - {self.created_at}"
+        return f"{self.backup_type} backup - {self.backup_created_at}"
 
     def get_size_display(self):
         if self.size is None:

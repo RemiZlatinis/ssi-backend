@@ -27,12 +27,18 @@ class BackupAdmin(admin.ModelAdmin):
         "status",
         "size_display",
         "file_status",
-        "created_at",
+        "backup_created_at",
         "admin_actions",
     )
-    list_filter = ("backup_type", "status", "created_at")
+    list_filter = ("backup_type", "status", "backup_created_at")
     search_fields = ("file_path",)
-    readonly_fields = ("file_path", "size", "created_at", "completed_at")
+    readonly_fields = (
+        "file_path",
+        "size",
+        "record_created_at",
+        "backup_created_at",
+        "completed_at",
+    )
     actions = ["restore_selected_backup"]
 
     def file_status(self, obj):
@@ -158,6 +164,7 @@ class BackupAdmin(admin.ModelAdmin):
                 # Find the latest backup file created
                 self._update_backup_with_latest_file(backup, backup_type)
                 backup.status = "completed"
+                backup.backup_created_at = timezone.now()
                 backup.completed_at = timezone.now()
                 backup.save()
 
