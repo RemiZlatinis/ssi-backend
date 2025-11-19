@@ -100,6 +100,7 @@ class Command(BaseCommand):
 
             # Determine label and backup_type from metadata if available
             label = metadata.get("label", "")
+            env = metadata.get("env", "")
             # If backup_type is in metadata, use it, otherwise use the passed arg
             # (though the passed arg is usually correct based on file extension
             # filtering)
@@ -116,6 +117,7 @@ class Command(BaseCommand):
                     "backup_created_at": backup_created_at,
                     "completed_at": timezone.now(),  # Or keep it same as created?
                     "label": label,
+                    "env": env,
                 },
             )
 

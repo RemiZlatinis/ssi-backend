@@ -23,6 +23,7 @@ class BackupAdmin(admin.ModelAdmin):
     list_display = (
         "backup_type",
         "label",
+        "env",
         "completed_at",
         "status",
         "size_display",
@@ -59,16 +60,21 @@ class BackupAdmin(admin.ModelAdmin):
         actions = []
 
         if obj.status == "completed" and obj.file_path and obj.file_exists:
-            # Restore button
-            restore_url = reverse("admin:restore_backup", args=[obj.id])
-            actions.append(
-                format_html(
-                    '<a class="button" href="{}" style="background-color: #56914a; '
-                    "color: white; padding: 3px 8px; text-decoration: none; "
-                    'border-radius: 3px; margin-right: 5px;">Restore</a>',
-                    restore_url,
+            # Restore button - only if environment matches
+            current_env = os.getenv("ENVIRONMENT")
+            if obj.env and current_env and obj.env != current_env:
+                # Environment mismatch - do not show restore button
+                pass
+            else:
+                restore_url = reverse("admin:restore_backup", args=[obj.id])
+                actions.append(
+                    format_html(
+                        '<a class="button" href="{}" style="background-color: #56914a; '
+                        "color: white; padding: 3px 8px; text-decoration: none; "
+                        'border-radius: 3px; margin-right: 5px;">Restore</a>',
+                        restore_url,
+                    )
                 )
-            )
 
         # Download button (if file exists)
         if obj.file_path and obj.file_exists:
@@ -152,8 +158,9 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method == "POST":
             backup_type = request.POST.get("backup_type", "db")
             label = request.POST.get("label", "")
+            env = os.getenv("ENVIRONMENT", "development")
             backup = Backup.objects.create(
-                backup_type=backup_type, status="pending", label=label
+                backup_type=backup_type, status="pending", label=label, env=env
             )
             output = io.StringIO()
 
@@ -228,6 +235,7 @@ class BackupAdmin(admin.ModelAdmin):
 
             metadata = {
                 "label": backup.label,
+                "env": backup.env,
                 "backup_type": backup.backup_type,
                 "backup_created_at": (
                     backup.backup_created_at.isoformat()

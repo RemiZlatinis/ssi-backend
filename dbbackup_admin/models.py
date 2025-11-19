@@ -14,6 +14,7 @@ class Backup(models.Model):
     )
     file_path = models.CharField(max_length=255, blank=True)
     label = models.CharField(max_length=255, blank=True, default="")
+    env = models.CharField(max_length=50, blank=True, default="")
     size = models.PositiveIntegerField(blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     record_created_at = models.DateTimeField(auto_now_add=True)
