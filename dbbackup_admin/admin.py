@@ -147,7 +147,6 @@ class BackupAdmin(admin.ModelAdmin):
                 self._update_backup_with_latest_file(backup, backup_type)
                 backup.status = "completed"
                 backup.backup_created_at = timezone.now()
-                backup.completed_at = timezone.now()
                 backup.save()
 
                 # Create metadata file

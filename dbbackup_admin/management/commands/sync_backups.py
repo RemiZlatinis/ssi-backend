@@ -115,7 +115,6 @@ class Command(BaseCommand):
                     "size": file_size,
                     "status": "completed",
                     "backup_created_at": backup_created_at,
-                    "completed_at": timezone.now(),  # Or keep it same as created?
                     "label": label,
                     "env": env,
                 },

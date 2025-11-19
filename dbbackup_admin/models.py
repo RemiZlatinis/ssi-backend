@@ -45,3 +45,46 @@ class Backup(models.Model):
             return storages["dbbackup"].exists(self.file_path)
         except Exception:
             return False
+
+    def delete(self, *args, **kwargs):
+        """
+        Override delete to rename the file in storage instead of deleting it.
+        """
+        if self.file_path:
+            try:
+                storage = storages["dbbackup"]
+
+                def rename_file(old_name, new_name):
+                    if storage.exists(old_name):
+                        # Try to use move if available (some backends might support it)
+                        # Otherwise copy and delete
+                        try:
+                            # Open the old file
+                            with storage.open(old_name) as f:
+                                # Save to new location
+                                storage.save(new_name, f)
+                            # Delete old file
+                            storage.delete(old_name)
+                        except Exception as e:
+                            import logging
+
+                            logger = logging.getLogger("dbbackup_admin")
+                            logger.warning(
+                                f"Failed to rename {old_name} to {new_name}: {e}"
+                            )
+
+                # Rename backup file
+                rename_file(self.file_path, f"{self.file_path}.deleted")
+
+                # Rename metadata file
+                rename_file(f"{self.file_path}.meta", f"{self.file_path}.meta.deleted")
+
+            except Exception as e:
+                import logging
+
+                logger = logging.getLogger("dbbackup_admin")
+                logger.warning(
+                    f"Failed to process file deletion for backup {self.id}: {e}"
+                )
+
+        super().delete(*args, **kwargs)
