@@ -2,41 +2,28 @@
 {% load i18n %}
 
 {% block object-tools-items %}
-    {{ block.super }}
-    <li>
-        <a href="{{ create_backup_url }}" class="addlink">
-            {% trans 'Create Backup' %}
-        </a>
-    </li>
-    <li>
-        <a href="{{ sync_backups_url }}" class="addlink">
-            {% trans 'Sync Backups' %}
-        </a>
-    </li>
+{{ block.super }}
+<li>
+    <a href="{{ create_backup_url }}" class="addlink">
+        {% trans 'Create Backup' %}
+    </a>
+</li>
+<li>
+    <a href="{{ sync_backups_url }}" class="addlink">
+        {% trans 'Sync Backups' %}
+    </a>
+</li>
 {% endblock %}
 
 
 {% block extrastyle %}{{ block.super }}
 {% comment %} This block is hotfix because the info class does not working {% endcomment %}
 <style>
-ul.messagelist li.info {
-    background: #d1ecf1 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230c5460"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-6h-2v6zm0-8h2V7h-2v2z"/></svg>') 40px 14px no-repeat !important;
-    background-size: 14px auto !important;
-    border: 1px solid #bee5eb !important;
-    color: #0c5460 !important;
-}
+    ul.messagelist li.info {
+        background: #d1ecf1 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230c5460"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v-6h-2v6zm0-8h2V7h-2v2z"/></svg>') 40px 14px no-repeat !important;
+        background-size: 14px auto !important;
+        border: 1px solid #bee5eb !important;
+        color: #0c5460 !important;
+    }
 </style>
-{% endblock %}
-
-
-{% block search %}
-    {{ block.super }}
-    <ul class="messagelist">
-        <li class="info">
-            <strong>{% trans "Note:" %}</strong>
-            {% trans "'CREATED' AT refers to when the backup record was created in the current database. " %}
-            {% trans "'COMPLETED AT' refers to when the actual backup file was created. " %}
-            {% trans "If you use 'SYNC BACKUPS', you might see older backup files with recent 'CREATED AT' datetime." %}
-        </li>
-    </ul>
 {% endblock %}

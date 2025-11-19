@@ -57,23 +57,6 @@ class BackupAdmin(admin.ModelAdmin):
         """Display action buttons for each backup."""
         actions = []
 
-        if obj.status == "completed" and obj.file_path and obj.file_exists:
-            # Restore button - only if environment matches
-            current_env = os.getenv("ENVIRONMENT")
-            if obj.env and current_env and obj.env != current_env:
-                # Environment mismatch - do not show restore button
-                pass
-            else:
-                restore_url = reverse("admin:restore_backup", args=[obj.id])
-                actions.append(
-                    format_html(
-                        '<a class="button" href="{}" style="background-color: #56914a; '
-                        "color: white; padding: 3px 8px; text-decoration: none; "
-                        'border-radius: 3px; margin-right: 5px;">Restore</a>',
-                        restore_url,
-                    )
-                )
-
         # Download button (if file exists)
         if obj.file_path and obj.file_exists:
             download_url = reverse("admin:download_backup", args=[obj.id])
@@ -86,32 +69,26 @@ class BackupAdmin(admin.ModelAdmin):
                 )
             )
 
+        # Restore button - only if environment matches
+        if obj.status == "completed" and obj.file_path and obj.file_exists:
+            current_env = os.getenv("ENVIRONMENT")
+            if obj.env != current_env:
+                # Environment mismatch - do not show restore button
+                pass
+            else:
+                restore_url = reverse("admin:restore_backup", args=[obj.id])
+                actions.append(
+                    format_html(
+                        '<a class="button" href="{}" style="background-color: #56914a; '
+                        "color: white; padding: 3px 8px; text-decoration: none; "
+                        'border-radius: 3px; margin-left: 5px;">Restore</a>',
+                        restore_url,
+                    )
+                )
+
         return mark_safe("".join(actions)) if actions else "-"
 
     admin_actions.short_description = "Actions"
-
-    def restore_selected_backup(self, request, queryset):
-        """Admin action to restore selected backup."""
-        if queryset.count() != 1:
-            self.message_user(
-                request, "Please select exactly one backup to restore.", level="error"
-            )
-            return
-
-        backup = queryset.first()
-        if (
-            backup.status != "completed"
-            or not backup.file_path
-            or not backup.file_exists
-        ):
-            self.message_user(
-                request, "Selected backup cannot be restored.", level="error"
-            )
-            return
-
-        return HttpResponseRedirect(reverse("admin:restore_backup", args=[backup.id]))
-
-    restore_selected_backup.short_description = "Restore selected backup"
 
     def get_urls(self):
         """Add custom URLs for backup operations."""
@@ -156,7 +133,7 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method == "POST":
             backup_type = request.POST.get("backup_type", "db")
             label = request.POST.get("label", "")
-            env = os.getenv("ENVIRONMENT", "development")
+            env = os.getenv("ENVIRONMENT", None)
             backup = Backup.objects.create(
                 backup_type=backup_type, status="pending", label=label, env=env
             )
