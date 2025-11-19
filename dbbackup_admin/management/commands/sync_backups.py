@@ -51,76 +51,80 @@ class Command(BaseCommand):
         updated_count = 0
 
         for filename in files:
-            # Parse filename to extract information
-            # Expected format for db: {database}-{hash}-{timestamp}.psql.bin
-            # Expected format for media: {timestamp}.tar
-            if backup_type == "db":
-                match = re.match(
-                    r"(.+)-(.+)-(\d{4}-\d{2}-\d{2}-\d{6})\.psql\.bin", filename
+            # Check for metadata file
+            meta_filename = f"{filename}.meta"
+            metadata = {}
+            try:
+                if storage.exists(meta_filename):
+                    import json
+
+                    with storage.open(meta_filename) as f:
+                        metadata = json.load(f)
+            except Exception as e:
+                self.stderr.write(
+                    self.style.WARNING(f"Could not read metadata for {filename}: {e}")
                 )
-                if match:
-                    _, _, timestamp_str = match.groups()
 
-                    # Parse timestamp
-                    timestamp = timezone.datetime.strptime(
-                        timestamp_str, "%Y-%m-%d-%H%M%S"
-                    )
-                    timestamp = timezone.make_aware(timestamp)
-
-                    # Get file size from storage
-                    file_size = storage.size(filename)
-
-                    # Check if backup already exists
-                    _, created = Backup.objects.get_or_create(
-                        file_path=filename,
-                        defaults={
-                            "backup_type": backup_type,
-                            "size": file_size,
-                            "status": "completed",
-                            "created_at": timestamp,
-                            "completed_at": timestamp,
-                        },
-                    )
-
-                    if created:
-                        created_count += 1
-                        self.stdout.write(
-                            self.style.SUCCESS(f"Created backup record: {filename}")
-                        )
-                    else:
-                        # If you want to update existing records, add logic here
-                        updated_count += 1
-            else:  # media backup
+            # Determine backup_created_at
+            backup_created_at = None
+            if "backup_created_at" in metadata and metadata["backup_created_at"]:
+                timestamp_str = metadata["backup_created_at"]
                 try:
-                    # For media backups, use the file modification time from storage
-                    timestamp = storage.get_modified_time(filename)
+                    backup_created_at = timezone.datetime.fromisoformat(timestamp_str)
+                except ValueError:
+                    pass
 
-                    # Get file size from storage
-                    file_size = storage.size(filename)
-                except (OSError, NotImplementedError) as e:
-                    self.stderr.write(
-                        self.style.WARNING(f"Error processing {filename}: {e}")
+            if not backup_created_at:
+                # Fallback to filename parsing or modification time
+                if backup_type == "db":
+                    match = re.match(
+                        r"(.+)-(.+)-(\d{4}-\d{2}-\d{2}-\d{6})\.psql\.bin", filename
                     )
-                    continue
+                    if match:
+                        _, _, timestamp_str = match.groups()
+                        timestamp = timezone.datetime.strptime(
+                            timestamp_str, "%Y-%m-%d-%H%M%S"
+                        )
+                        backup_created_at = timezone.make_aware(timestamp)
+                else:  # media backup
+                    try:
+                        backup_created_at = storage.get_modified_time(filename)
+                    except (OSError, NotImplementedError):
+                        pass
 
-                # Check if backup already exists
-                _, created = Backup.objects.get_or_create(
-                    file_path=filename,
-                    defaults={
-                        "backup_type": backup_type,
-                        "size": file_size,
-                        "status": "completed",
-                        "created_at": timestamp,
-                        "completed_at": timestamp,
-                    },
+            # Get file size from storage
+            try:
+                file_size = storage.size(filename)
+            except (OSError, NotImplementedError):
+                file_size = None
+
+            # Determine label and backup_type from metadata if available
+            label = metadata.get("label", "")
+            # If backup_type is in metadata, use it, otherwise use the passed arg
+            # (though the passed arg is usually correct based on file extension
+            # filtering)
+            final_backup_type = metadata.get("backup_type", backup_type)
+
+            # Check if backup already exists
+            # We use file_path as the unique identifier
+            backup, created = Backup.objects.update_or_create(
+                file_path=filename,
+                defaults={
+                    "backup_type": final_backup_type,
+                    "size": file_size,
+                    "status": "completed",
+                    "backup_created_at": backup_created_at,
+                    "completed_at": timezone.now(),  # Or keep it same as created?
+                    "label": label,
+                },
+            )
+
+            if created:
+                created_count += 1
+                self.stdout.write(
+                    self.style.SUCCESS(f"Created backup record: {filename}")
                 )
+            else:
+                updated_count += 1
 
-                if created:
-                    created_count += 1
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Created backup record: {filename}")
-                    )
-                else:
-                    # If you want to update existing records, add logic here
-                    updated_count += 1
         return created_count, updated_count

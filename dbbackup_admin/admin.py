@@ -168,6 +168,9 @@ class BackupAdmin(admin.ModelAdmin):
                 backup.completed_at = timezone.now()
                 backup.save()
 
+                # Create metadata file
+                self._create_metadata_file(backup)
+
                 self.message_user(
                     request,
                     f"Backup created successfully: {backup.file_path}",
@@ -211,6 +214,37 @@ class BackupAdmin(admin.ModelAdmin):
             "admin/dbbackup_admin/backup/create_backup.html",
             context,
         )
+
+    def _create_metadata_file(self, backup):
+        """Create a sidecar metadata file for the backup."""
+        if not backup.file_path:
+            return
+
+        try:
+            import json
+
+            storage = storages["dbbackup"]
+            meta_file_path = f"{backup.file_path}.meta"
+
+            metadata = {
+                "label": backup.label,
+                "backup_type": backup.backup_type,
+                "backup_created_at": (
+                    backup.backup_created_at.isoformat()
+                    if backup.backup_created_at
+                    else None
+                ),
+            }
+
+            # storage.save expects a file-like object
+            from django.core.files.base import ContentFile
+
+            storage.save(meta_file_path, ContentFile(json.dumps(metadata)))
+
+        except Exception as e:
+            logger.warning(
+                f"Could not create metadata file for backup {backup.id}: {e}"
+            )
 
     def restore_backup_view(self, request, backup_id):
         """View to restore a specific backup."""
