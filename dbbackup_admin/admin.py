@@ -24,11 +24,10 @@ class BackupAdmin(admin.ModelAdmin):
         "backup_type",
         "label",
         "env",
-        "completed_at",
+        "backup_created_at",
         "status",
         "size_display",
         "file_status",
-        "backup_created_at",
         "admin_actions",
     )
     list_filter = ("backup_type", "status", "backup_created_at")
@@ -38,7 +37,6 @@ class BackupAdmin(admin.ModelAdmin):
         "size",
         "record_created_at",
         "backup_created_at",
-        "completed_at",
     )
     actions = ["restore_selected_backup"]
 

@@ -19,7 +19,6 @@ class Backup(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     record_created_at = models.DateTimeField(auto_now_add=True)
     backup_created_at = models.DateTimeField(blank=True, null=True)
-    completed_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ["-backup_created_at"]
