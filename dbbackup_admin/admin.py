@@ -22,6 +22,7 @@ logger = logging.getLogger("dbbackup_admin")
 class BackupAdmin(admin.ModelAdmin):
     list_display = (
         "backup_type",
+        "label",
         "completed_at",
         "status",
         "size_display",
@@ -144,7 +145,10 @@ class BackupAdmin(admin.ModelAdmin):
         """View to create a new backup."""
         if request.method == "POST":
             backup_type = request.POST.get("backup_type", "db")
-            backup = Backup.objects.create(backup_type=backup_type, status="pending")
+            label = request.POST.get("label", "")
+            backup = Backup.objects.create(
+                backup_type=backup_type, status="pending", label=label
+            )
             output = io.StringIO()
 
             try:
@@ -183,6 +187,9 @@ class BackupAdmin(admin.ModelAdmin):
             choices=[("db", "Database"), ("media", "Media")],
             widget=forms.RadioSelect,
             initial="db",
+        )
+        form.fields["label"] = forms.CharField(
+            required=False, widget=forms.TextInput(attrs={"style": "width: 300px;"})
         )
 
         context = {

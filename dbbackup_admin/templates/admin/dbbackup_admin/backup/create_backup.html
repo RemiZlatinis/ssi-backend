@@ -3,10 +3,10 @@
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
-&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
-&rsaquo; <a href="{% url 'admin:dbbackup_admin_backup_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
-&rsaquo; {% trans 'Create Backup' %}
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url 'admin:dbbackup_admin_backup_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; {% trans 'Create Backup' %}
 </div>
 {% endblock %}
 
@@ -17,15 +17,24 @@
 <p>{% trans 'This process may take a few minutes depending on the size of your database.' %}</p>
 
 <form method="post">
-{% csrf_token %}
-<div class="form-row">
-    <div>
-        <label for="id_backup_type_0" style="display: block; margin-bottom: 10px; font-weight: bold;">{% trans 'Backup Type:' %}</label>
-        {{ form.backup_type }}
+    {% csrf_token %}
+    <div class="form-row">
+        <div>
+            <label for="id_backup_type_0" style="display: block; margin-bottom: 10px; font-weight: bold;">Backup
+                Type:</label>
+            {{ form.backup_type }}
+        </div>
+        <br>
+        <div>
+            <label for="id_label" style="display: block; margin-bottom: 10px; font-weight: bold;">Label
+                (optional):</label>
+            {{ form.label }}
+        </div>
     </div>
-</div>
-<br>
-<input type="submit" value="{% trans 'Create Backup' %}" class="default" style="background-color: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
-<a href="{% url 'admin:dbbackup_admin_backup_changelist' %}" class="button" style="margin-left: 10px; padding: 8px 16px; text-decoration: none; border-radius: 4px;">{% trans 'Cancel' %}</a>
+    <br>
+    <input type="submit" value="Create Backup" class="default"
+        style="background-color: #4CAF50; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+    <a href="{% url 'admin:dbbackup_admin_backup_changelist' %}" class="button"
+        style="margin-left: 10px; padding: 8px 16px; text-decoration: none; border-radius: 4px;">Cancel</a>
 </form>
 {% endblock %}
