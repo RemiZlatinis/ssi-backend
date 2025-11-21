@@ -5,7 +5,6 @@ from typing import Any
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.db import transaction
 
 from notifications.models import Device
 
@@ -55,7 +54,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         else:
             logger.info(f"Agent '{self.agent.name}' connected successfully.")
             await self.accept()
-            await self._increment_connections_and_set_online()
+            await self._set_online()
 
             # On successful connection, check and update the agent's IP address.
             await self._check_and_update_agent_ip()
@@ -84,7 +83,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """
         if hasattr(self, "agent") and self.agent:
             logger.info(f"Agent '{self.agent.name}' disconnected.")
-            await self._decrement_connections_and_set_offline()
+            await self._set_offline()
             if hasattr(self, "channel_layer") and self.channel_layer:
                 # Discard from agent-specific group
                 if hasattr(self, "agent_group_name"):
@@ -277,61 +276,34 @@ class AgentConsumer(AsyncWebsocketConsumer):
             await self._update_agent_ip_in_db(current_ip)
 
     @database_sync_to_async
-    def _increment_connections_and_set_online(self) -> None:
-        """Increments active connections and sets online if transitioning from 0."""
-        if self.agent:
-            with transaction.atomic():
-                agent = Agent.objects.select_for_update().get(pk=self.agent.pk)
-                agent.active_connections += 1
-                was_offline = agent.active_connections == 1
-                if was_offline:
-                    agent.is_online = True
-                agent.save(
-                    update_fields=(
-                        ["active_connections", "is_online"]
-                        if was_offline
-                        else ["active_connections"]
-                    )
-                )
-                # Send notification if agent came online
-                if was_offline and agent.owner:
-                    user = agent.owner
-                    user_devices = Device.objects.filter(
-                        user=user, status=Device.STATUS_ACTIVE
-                    )
-                    for device in user_devices:
-                        device.send_notification(
-                            title=f"Agent '{agent.name}' is now online"
-                        )
+    def _set_online(self) -> None:
+        """Set the agent as online and send notification."""
+        if not self.agent:
+            return
+        self.agent.is_online = True
+        self.agent.save(update_fields=["is_online"])
+        logger.info(f"Agent '{self.agent.name}' is now online.")
+
+        # Send notification
+        user = self.agent.owner
+        user_devices = Device.objects.filter(user=user, status=Device.STATUS_ACTIVE)
+        for device in user_devices:
+            device.send_notification(title=f"Agent '{self.agent.name}' is now online")
 
     @database_sync_to_async
-    def _decrement_connections_and_set_offline(self) -> None:
-        """Decrements active connections and sets offline if reaching 0."""
-        if self.agent:
-            with transaction.atomic():
-                agent = Agent.objects.select_for_update().get(pk=self.agent.pk)
-                agent.active_connections -= 1
-                if agent.active_connections < 0:
-                    agent.active_connections = 0
-                if agent.active_connections == 0:
-                    agent.is_online = False
-                agent.save(
-                    update_fields=(
-                        ["active_connections", "is_online"]
-                        if agent.active_connections == 0
-                        else ["active_connections"]
-                    )
-                )
-                # Send notification if agent went offline
-                if agent.active_connections == 0 and agent.owner:
-                    user = agent.owner
-                    user_devices = Device.objects.filter(
-                        user=user, status=Device.STATUS_ACTIVE
-                    )
-                    for device in user_devices:
-                        device.send_notification(
-                            title=f"Agent '{agent.name}' is now offline"
-                        )
+    def _set_offline(self) -> None:
+        """Set the agent as offline and send notification."""
+        if not self.agent:
+            return
+        self.agent.is_online = False
+        self.agent.save(update_fields=["is_online"])
+        logger.info(f"Agent '{self.agent.name}' is now offline.")
+
+        # Send notification
+        user = self.agent.owner
+        user_devices = Device.objects.filter(user=user, status=Device.STATUS_ACTIVE)
+        for device in user_devices:
+            device.send_notification(title=f"Agent '{self.agent.name}' is now offline")
 
     @database_sync_to_async
     def sync_services_db(

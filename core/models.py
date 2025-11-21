@@ -36,13 +36,12 @@ class Agent(models.Model):
 
     # Dynamic State
     is_online = models.BooleanField(default=False)
-    active_connections = models.PositiveIntegerField(
-        default=0, help_text="The current number of active connections to the agent."
+    last_seen = models.DateTimeField(
+        auto_now=True,
+        null=True,
+        blank=True,
+        help_text="Timestamp of the last update from the agent.",
     )
-    # last_seen = models.DateTimeField(
-    #     null=True, blank=True,
-    #     help_text="Timestamp of the last update from the agent."
-    # )
 
     class Meta:
         ordering = ["name"]
