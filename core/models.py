@@ -34,10 +34,9 @@ class Agent(models.Model):
         default=RegistrationStatus.PENDING,
     )
 
-    # Dynamic State
+    # State tracking
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(
-        auto_now=True,
         null=True,
         blank=True,
         help_text="Timestamp of the last update from the agent.",
@@ -48,6 +47,24 @@ class Agent(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def mark_connected(self) -> None:
+        self.is_online = True
+        self.last_seen = timezone.now()
+        self.save(update_fields=["is_online", "last_seen"])
+
+    def mark_disconnected(self) -> None:
+        self.is_online = False
+        self.last_seen = timezone.now()
+        self.save(update_fields=["is_online", "last_seen"])
+
+    def update_last_seen(self) -> None:
+        self.last_seen = timezone.now()
+        update_fields = ["last_seen"]
+        if not self.is_online:
+            self.is_online = True
+            update_fields.append("is_online")
+        self.save(update_fields=update_fields)
 
 
 class Service(models.Model):

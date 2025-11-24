@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -18,6 +18,10 @@ class AgentConsumer(AsyncWebsocketConsumer):
     """
     WebSocket consumer that handles connections from agents.
     """
+
+    agent: Optional[Agent] = None
+    agent_key: Optional[uuid.UUID] = None
+    agent_group_name: Optional[str] = None
 
     async def connect(self) -> None:
         """
@@ -55,8 +59,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
             logger.info(f"Agent '{self.agent.name}' connected successfully.")
             await self.accept()
             await self._set_online()
-
-            # On successful connection, check and update the agent's IP address.
             await self._check_and_update_agent_ip()
 
             # Dynamically define a group name based on the agent's owner
@@ -153,6 +155,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             return
         logger.info(f"Processing 'agent_hello' from {self.agent.name}")
         services_info = event_data.get("services", [])
+        await self.update_last_seen()
         await self.sync_services_db(self.agent, services_info)
 
     async def _handle_service_added(self, event_data: dict[str, Any]) -> None:
@@ -160,6 +163,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         service_info = event_data.get("service")
         if service_info:
             logger.info(f"Processing 'service_added' for {service_info.get('name')}")
+            await self.update_last_seen()
             await self.add_or_update_service_db(self.agent, service_info)
             # After adding/updating service, broadcast an update to the user's group
             await self._broadcast_service_added(service_info)
@@ -169,6 +173,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         service_id = event_data.get("service_id")
         if service_id:
             logger.info(f"Processing 'service_removed' for ID {service_id}")
+            await self.update_last_seen()
             await self.remove_service_db(self.agent, service_id)
             # After removing service, broadcast an update to the user's group
             await self._broadcast_service_removed(service_id)
@@ -180,6 +185,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
             logger.info(
                 f"Processing 'status_update' for service ID {update.get('service_id')}"
             )
+            await self.update_last_seen()
             await self.update_service_status_db(self.agent, update)
             # After updating service status, broadcast an update to the user's group
             await self._broadcast_service_status_update(update)
@@ -277,12 +283,10 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _set_online(self) -> None:
-        """Set the agent as online and send notification."""
+        """Set the agent as online and send push notification."""
         if not self.agent:
             return
-        self.agent.is_online = True
-        self.agent.save(update_fields=["is_online"])
-        logger.info(f"Agent '{self.agent.name}' is now online.")
+        self.agent.mark_connected()
 
         # Send notification
         user = self.agent.owner
@@ -292,18 +296,23 @@ class AgentConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _set_offline(self) -> None:
-        """Set the agent as offline and send notification."""
+        """Set the agent as offline and send push notification."""
         if not self.agent:
             return
-        self.agent.is_online = False
-        self.agent.save(update_fields=["is_online"])
-        logger.info(f"Agent '{self.agent.name}' is now offline.")
+        self.agent.mark_disconnected()
 
         # Send notification
         user = self.agent.owner
         user_devices = Device.objects.filter(user=user, status=Device.STATUS_ACTIVE)
         for device in user_devices:
             device.send_notification(title=f"Agent '{self.agent.name}' is now offline")
+
+    @database_sync_to_async
+    def update_last_seen(self) -> None:
+        """Updates the agent's last_seen timestamp."""
+        if not self.agent:
+            return
+        self.agent.update_last_seen()
 
     @database_sync_to_async
     def sync_services_db(
