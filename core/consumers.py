@@ -202,6 +202,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     "agent_id": str(self.agent.pk),
                     "agent_name": self.agent.name,
                     "is_online": is_online,
+                    "last_seen": (
+                        self.agent.last_seen.isoformat()
+                        if self.agent.last_seen
+                        else None
+                    ),
                 },
             )
 

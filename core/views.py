@@ -82,6 +82,9 @@ class AgentViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
                         "agent_name": agent.name,  # The new name
                         "is_online": agent.is_online,
                         "ip_address": agent.ip_address,
+                        "last_seen": (
+                            agent.last_seen.isoformat() if agent.last_seen else None
+                        ),
                     },
                 )
 
@@ -350,6 +353,7 @@ async def sse_agent_status(request: HttpRequest) -> StreamingHttpResponse:
                         "agent_name": message["agent_name"],
                         "is_online": message["is_online"],
                         "ip_address": message.get("ip_address", None),
+                        "last_seen": message.get("last_seen", None),
                     }
                     yield f"data: {json.dumps(data)}\n\n".encode("utf-8")
                 elif message["type"] == "service.status.update":
@@ -417,6 +421,7 @@ def get_all_agent_statuses(user: Any) -> list[dict[str, Any]]:
             "agent_name": agent.name,
             "is_online": agent.is_online,  # Use the is_online field
             "ip_address": agent.ip_address,
+            "last_seen": agent.last_seen.isoformat() if agent.last_seen else None,
             "registration_status": agent.registration_status,
             "services": [],
         }

@@ -52,6 +52,7 @@ class AgentSerializer(serializers.ModelSerializer):
             "ip_address",
             "registration_status",
             "created_at",
+            "last_seen",
             "services",  # The nested list of services
         ]
         read_only_fields = [
@@ -60,6 +61,7 @@ class AgentSerializer(serializers.ModelSerializer):
             "ip_address",
             "registration_status",
             "created_at",
+            "last_seen",
             "services",
         ]
 
