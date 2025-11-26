@@ -9,7 +9,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from notifications.models import Device
 
 from .models import Agent, Service
-from .utils import get_client_ip
+from .utils import get_client_ip, get_static_icon_url
 
 logger = logging.getLogger("core")
 
@@ -297,7 +297,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
         user = self.agent.owner
         user_devices = Device.objects.filter(user=user, status=Device.STATUS_ACTIVE)
         for device in user_devices:
-            device.send_notification(title=f"Agent '{self.agent.name}' is now online")
+            device.send_notification(
+                title=f"Agent '{self.agent.name}' is now online",
+                channel_id="agent-status",
+                large_icon=get_static_icon_url("ok.png"),
+            )
 
     @database_sync_to_async
     def _set_offline(self) -> None:
@@ -310,7 +314,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
         user = self.agent.owner
         user_devices = Device.objects.filter(user=user, status=Device.STATUS_ACTIVE)
         for device in user_devices:
-            device.send_notification(title=f"Agent '{self.agent.name}' is now offline")
+            device.send_notification(
+                title=f"Agent '{self.agent.name}' is now offline",
+                channel_id="agent-status",
+                large_icon=get_static_icon_url("unknown.png"),
+            )
 
     @database_sync_to_async
     def update_last_seen(self) -> None:

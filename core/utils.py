@@ -43,3 +43,23 @@ def get_client_ip(
         return ip_tuple[0]
 
     return None
+
+
+def get_static_icon_url(icon_name: str) -> str:
+    """
+    Returns the full public URL for a static icon.
+    """
+    import os
+
+    from django.conf import settings
+
+    base_url = "http://127.0.0.1:8000"
+
+    if settings.ENVIRONMENT == "production":
+        host = os.getenv("HOST")
+        if host:
+            domain = host.split(",")[0].strip()
+            base_url = f"https://{domain}"
+
+    static_url = settings.STATIC_URL.strip("/")
+    return f"{base_url}/{static_url}/icons/{icon_name}"

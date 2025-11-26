@@ -59,6 +59,8 @@ class Device(models.Model):
         title: str = "Title",
         body: str = "",
         data: dict[str, Any] | None = None,
+        channel_id: str | None = None,
+        large_icon: str | None = None,
         **extra: Any,
     ) -> dict[str, Any] | None:
         if self.status == self.STATUS_INACTIVE:
@@ -66,6 +68,24 @@ class Device(models.Model):
 
         if data is None:
             data = {}
+
+        # Construct the payload
+        payload = {
+            "to": self.token,
+            "title": title,
+            "body": body,
+            "data": data,
+            **extra,
+        }
+
+        # Add Android-specific fields
+        if channel_id or large_icon:
+            android_payload = payload.get("android", {})
+            if channel_id:
+                android_payload["channelId"] = channel_id
+            if large_icon:
+                android_payload["largeIcon"] = large_icon
+            payload["android"] = android_payload
 
         try:
             with requests.Session() as session:
@@ -76,15 +96,7 @@ class Device(models.Model):
                         "Content-Type": "application/json",
                         "Accept-Encoding": "gzip",
                     },
-                    json=[
-                        {
-                            "to": self.token,
-                            "title": title,
-                            "body": body,
-                            "data": data,
-                            **extra,
-                        }
-                    ],
+                    json=[payload],
                 )
                 result: dict[str, Any] = response.json()
                 logger.info(f"Notification sent to device {self.id}: {result}")

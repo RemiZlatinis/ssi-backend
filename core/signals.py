@@ -4,6 +4,7 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from core.models import Service
+from core.utils import get_static_icon_url
 from notifications.models import Device
 
 
@@ -42,6 +43,22 @@ def post_save_service_status(
         old_status = getattr(instance, "_original_last_status", None)
         new_status = instance.last_status
         if old_status != new_status:
+            # Determine channel and icon based on status
+            status_lower = new_status.lower() if new_status else "unknown"
+            # Validate status to ensure we have a mapping
+            if status_lower not in [
+                "ok",
+                "warning",
+                "error",
+                "update",
+                "failure",
+                "unknown",
+            ]:
+                status_lower = "unknown"
+
+            channel_id = f"service-{status_lower}"
+            icon_name = f"{status_lower}.png"
+
             if instance.agent and instance.agent.owner:
                 user = instance.agent.owner
                 user_devices = Device.objects.filter(
@@ -51,4 +68,6 @@ def post_save_service_status(
                     device.send_notification(
                         title=f"{instance.name} - {new_status}",
                         body=instance.last_message,
+                        channel_id=channel_id,
+                        large_icon=get_static_icon_url(icon_name),
                     )
