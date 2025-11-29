@@ -58,7 +58,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         else:
             logger.info(f"Agent '{self.agent.name}' connected successfully.")
             await self.accept()
-            await self._set_online()
+            await self._set_online(self.channel_name)
             await self._check_and_update_agent_ip()
 
             # Dynamically define a group name based on the agent's owner
@@ -85,7 +85,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
         """
         if hasattr(self, "agent") and self.agent:
             logger.info(f"Agent '{self.agent.name}' disconnected.")
-            await self._set_offline()
+            await self._set_offline(self.channel_name)
             if hasattr(self, "channel_layer") and self.channel_layer:
                 # Discard from agent-specific group
                 if hasattr(self, "agent_group_name"):
@@ -287,11 +287,15 @@ class AgentConsumer(AsyncWebsocketConsumer):
             await self._update_agent_ip_in_db(current_ip)
 
     @database_sync_to_async
-    def _set_online(self) -> None:
+    def _set_online(self, channel_name: str) -> None:
         """Set the agent as online and send push notification."""
         if not self.agent:
             return
         self.agent.mark_connected()
+
+        # Update current channel name
+        self.agent.current_channel_name = channel_name
+        self.agent.save(update_fields=["current_channel_name"])
 
         # Send notification
         user = self.agent.owner
@@ -304,11 +308,26 @@ class AgentConsumer(AsyncWebsocketConsumer):
             )
 
     @database_sync_to_async
-    def _set_offline(self) -> None:
+    def _set_offline(self, channel_name: str) -> None:
         """Set the agent as offline and send push notification."""
         if not self.agent:
             return
+
+        # Refresh agent from DB to get the latest current_channel_name
+        self.agent.refresh_from_db()
+
+        if self.agent.current_channel_name != channel_name:
+            logger.info(
+                f"Ignoring disconnect for agent '{self.agent.name}' "
+                f"(channel {channel_name}) as it is not the active connection "
+                f"({self.agent.current_channel_name})."
+            )
+            return
+
         self.agent.mark_disconnected()
+        # Clear the channel name
+        self.agent.current_channel_name = None
+        self.agent.save(update_fields=["current_channel_name"])
 
         # Send notification
         user = self.agent.owner

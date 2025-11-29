@@ -41,6 +41,11 @@ class Agent(models.Model):
         blank=True,
         help_text="Timestamp of the last update from the agent.",
     )
+    current_channel_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="The channel name of the current active WebSocket connection.",
+    )
 
     class Meta:
         ordering = ["name"]
