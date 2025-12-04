@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 from .log import LOGGING  # noqa: F401
@@ -31,19 +32,8 @@ CORS_ALLOWED_ORIGINS = []
 if cors_env := os.getenv("CORS_ALLOWED_ORIGINS"):
     CORS_ALLOWED_ORIGINS.extend([o.strip() for o in cors_env.split(",")])
 
-CORS_ALLOWED_HEADERS = [
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
+CORS_ALLOW_HEADERS = list(default_headers) + [
     "cache-control",
-    "if-none-match",
-    "if-modified-since",
 ]
 
 INSTALLED_APPS = [
