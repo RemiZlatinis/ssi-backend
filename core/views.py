@@ -303,6 +303,28 @@ async def sse_agent_status(request: HttpRequest) -> StreamingHttpResponse:
     user = await sync_to_async(lambda: request.user)()
     is_authenticated = await sync_to_async(lambda: user.is_authenticated)()
 
+    # TODO: The following workaround exposes the user Token on the URL. We should
+    # create a unique endpoint for each agent SSE that doesn't require authentication.
+    # (Web SSE workaround)
+    # If not authenticated via headers/session, check for token in query params
+    if not is_authenticated:
+        token = request.GET.get("token")
+        if token:
+            try:
+                from django.contrib.auth.models import User
+                from rest_framework_simplejwt.tokens import AccessToken
+
+                # Validate token
+                access_token = AccessToken(token)
+                user_id = access_token["user_id"]
+
+                # Fetch user
+                user = await sync_to_async(User.objects.get)(id=user_id)
+                is_authenticated = True
+            except Exception:
+                # Token invalid or user not found
+                pass
+
     if not is_authenticated:
         return StreamingHttpResponse(
             [
