@@ -1,15 +1,18 @@
 [project]
 name = "ssi-backend"
 version = "0.1.0"
-description = "The Backend of the Service Status Indicator monitoring framework"
+description = "The Backend of the Service Status Indicator Monitoring System"
 authors = [
     {name = "RemiZlatinis",email = "remizlatinis@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
+
 dependencies = [
-    "django (>=5.2.6,<6.0.0)",
+    "django (>=6.0.0,<7.0.0)",
+
     "djangorestframework (>=3.16.1,<4.0.0)",
+
     "channels[daphne] (>=4.3.1,<5.0.0)",
     "django-allauth[socialaccount] (>=65.11.2,<66.0.0)",
     "djangorestframework-simplejwt (>=5.5.1,<6.0.0)",
@@ -43,7 +46,8 @@ djangorestframework-stubs = "^3.16.3"
 
 [tool.black]
 line-length = 88
-target-version = ["py312"]
+target-version = ["py314"]
+
 
 [tool.ruff]
 # Set the same line length as Black to ensure they agree.

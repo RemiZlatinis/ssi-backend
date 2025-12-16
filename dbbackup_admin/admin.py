@@ -43,8 +43,10 @@ class BackupAdmin(admin.ModelAdmin):
     def file_status(self, obj):
         """Display whether the backup file exists."""
         if obj.file_exists:
-            return format_html('<span style="color: #56914a;">✓ File exists</span>')
-        return format_html('<span style="color: #b33b46;">✗ File missing</span>')
+            return mark_safe('<span style="color: #56914a;">✓ File exists</span>')
+
+        return mark_safe('<span style="color: #b33b46;">✗ File missing</span>')
+
 
     file_status.short_description = "File Status"
 

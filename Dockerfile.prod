@@ -1,6 +1,6 @@
 # Multi-stage build for optimized production image
 # Stage 1: Build dependencies
-FROM python:3.12-alpine as builder
+FROM python:3.14-alpine as builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -27,8 +27,9 @@ COPY poetry.lock pyproject.toml ./
 # Export requirements.txt with only production dependencies
 RUN poetry export --without dev -o requirements.txt --without-hashes
 
+# =========================
 # Stage 2: Production image
-FROM python:3.12-alpine
+FROM python:3.14-alpine
 
 # Install runtime dependencies
 RUN apk add --no-cache \
