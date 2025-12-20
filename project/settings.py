@@ -1,4 +1,4 @@
-"""Django settings for Service Status Indicator (SSI) - Monitoring Framework project."""
+"""Django settings for Service Status Indicator (SSI) - Monitoring System project."""
 
 import os
 from datetime import timedelta
