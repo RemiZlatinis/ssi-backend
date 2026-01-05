@@ -234,10 +234,15 @@ elif ENVIRONMENT == "production":
         raise ValueError("DATABASE_URL is not set for a production environment!")
     else:
         DATABASES = {
-            "default": cast(dict[str, Any], dj_database_url.parse(DATABASE_URL)),
-            "OPTIONS": {
-                "sslmode": "require",
-            },
+            "default": {
+                **cast(dict[str, Any], dj_database_url.parse(DATABASE_URL)),
+                "CONN_MAX_AGE": 0,  # Required for ASGI/Daphne stability
+                "CONN_HEALTH_CHECKS": True,  # prevent crashing if the PG pooler temporarily drops a connection
+                "OPTIONS": {
+                    "sslmode": "require",
+                    "connect_timeout": 10,
+                },
+            }
         }
 
     CHANNEL_LAYERS = {
