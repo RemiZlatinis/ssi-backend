@@ -234,7 +234,10 @@ elif ENVIRONMENT == "production":
         raise ValueError("DATABASE_URL is not set for a production environment!")
     else:
         DATABASES = {
-            "default": cast(dict[str, Any], dj_database_url.parse(DATABASE_URL))
+            "default": cast(dict[str, Any], dj_database_url.parse(DATABASE_URL)),
+            "OPTIONS": {
+                "sslmode": "require",
+            },
         }
 
     CHANNEL_LAYERS = {
