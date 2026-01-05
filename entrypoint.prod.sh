@@ -5,7 +5,7 @@ set -e
 
 # Wait for database to be ready
 echo "Waiting for database to be ready..."
-while ! python manage.py healthcheck >/dev/null 2>&1; do
+until python manage.py healthcheck; do
   >&2 echo "Database is unavailable - sleeping"
   sleep 1
 done
