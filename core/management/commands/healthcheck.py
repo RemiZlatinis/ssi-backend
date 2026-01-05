@@ -12,8 +12,8 @@ class Command(BaseCommand):
         db_conn = connections["default"]
         try:
             db_conn.cursor()
-        except OperationalError:
-            self.stdout.write(self.style.ERROR("Database unavailable"))
+        except OperationalError as e:
+            self.stdout.write(self.style.ERROR(f"Database unavailable: {e}"))
             exit(1)
         else:
             self.stdout.write(self.style.SUCCESS("Database available"))
