@@ -17,8 +17,8 @@ echo "Running migrations..."
 python manage.py migrate --noinput
 
 # Create superuser if it doesn't exist (idempotent)
-echo "Checking for initial superuser..."
-python manage.py createsuperuser --noinput || true
+echo "Ensuring initial superuser exists..."
+python manage.py ensure_superuser
 
 # Start the application
 exec "$@"
