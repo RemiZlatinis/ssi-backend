@@ -1,6 +1,6 @@
 # Multi-stage build for optimized production image
 # Stage 1: Build dependencies
-FROM python:3.12-alpine as builder
+FROM python:3.12-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
