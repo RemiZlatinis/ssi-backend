@@ -20,6 +20,7 @@ services:
     volumes:
       - .:/app
     env_file:
+      - .env.development
       - ./.env
     depends_on:
       - db
