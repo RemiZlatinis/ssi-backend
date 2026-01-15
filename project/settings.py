@@ -2,7 +2,6 @@
 
 import os
 import sys
-from datetime import timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -10,7 +9,6 @@ import dj_database_url
 import sentry_sdk
 from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
-
 
 ################################################################################
 #                             ENVIRONMENT VARIABLES                            #
@@ -63,7 +61,7 @@ CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()
 ]
 
-# We include 'cache-control' to support Server-Sent Events (SSE) on Web browsers (Expo Web).
+# We include 'cache-control' to support Server-Sent Events (SSE) on browsers (Expo Web).
 # Libraries like 'react-native-sse' explicitly set 'Cache-Control: no-cache' to ensure
 # real-time delivery and prevent stream buffering. Standard browsers trigger a CORS
 # preflight for this header, requiring it to be explicitly allowed here.
@@ -88,14 +86,12 @@ INSTALLED_APPS = [
     #
     # Third party
     "rest_framework",
-    "rest_framework.authtoken",
     "channels",
     "allauth",
     "allauth.headless",
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
-    "dj_rest_auth",
     "corsheaders",
     "health_check",
     "health_check.db",
@@ -243,36 +239,18 @@ ACCOUNT_EMAIL_VERIFICATION = "none"  # Allow active user without verified email
 SOCIALACCOUNT_AUTO_SIGNUP = (
     True  # Automatically sign up users on successful social login
 )
-HEADLESS_ONLY = True  # Operate in headless mode
-SOCIALACCOUNT_EMAIL_AUTHENTICATION = True  # auto-link social accounts with emails.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True  # Auto-link social accounts with emails
 
-# DRF settings
+# Headless configuration (API-only mode for Expo SDK clients - mobile and web)
+HEADLESS_ONLY = True
+HEADLESS_CLIENTS = ["app", "browser"]  # We support both mobile and browser auth flows
+HEADLESS_ADAPTER = "authentication.adapters.CustomHeadlessAdapter"
+
+# DRF settings - using allauth's X-Session-Token authentication
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "allauth.headless.contrib.rest_framework.authentication.XSessionTokenAuthentication",
     ),
-}
-
-# dj-rest-auth settings
-REST_AUTH = {
-    "USE_JWT": True,
-    "JWT_AUTH_REFRESH_COOKIE": (
-        # Setting this to None disables HTTP-only cookie delivery.
-        # This force-returns the refresh token in the JSON response body,
-        # which is much easier for mobile apps (Expo/Native) to handle
-        # and store manually (e.g., via SecureStore).
-        None
-    ),
-    "USER_DETAILS_SERIALIZER": (
-        # Adds profile picture to the json response.
-        "authentication.serializers.CustomUserDetailsSerializer"
-    ),
-}
-
-# rest_framework_simplejwt settings
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=365),  # TODO: Implement refresh mechanism
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=365),
 }
 
 # django_channels

@@ -20,7 +20,7 @@ urlpatterns = [
     # API endpoints for core functionalities (agents, etc.)
     path("api/", include("core.urls")),
     # Authentication endpoints (login, logout, registration)
-    path("api/auth/", include("authentication.urls")),
+    path("api/", include("authentication.urls")),
     # Notification endpoints
     path("api/notifications/", include("notifications.urls")),
     # Health check

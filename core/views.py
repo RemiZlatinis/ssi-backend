@@ -1,9 +1,10 @@
 import asyncio
 import json
+import logging
 import uuid
 from typing import Any, AsyncGenerator, cast
 
-from asgiref.sync import async_to_sync, sync_to_async
+from asgiref.sync import async_to_sync
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from django.contrib.auth.models import User as AuthUser
@@ -19,6 +20,8 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 from rest_framework.views import APIView
 
+from authentication.decorators import authenticate_headless
+
 from .authentication import AgentAuthentication
 from .models import Agent, AgentRegistration
 from .serializers import (
@@ -28,6 +31,8 @@ from .serializers import (
     CompleteAgentRegistrationSerializer,
 )
 from .utils import get_client_ip
+
+logger = logging.getLogger("core")
 
 
 class AgentViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
@@ -291,40 +296,16 @@ class AgentMeView(APIView):
         return Response(serializer.data)
 
 
+# We use the `authenticate_headless` and not `require_headless_auth` decorator because
+# of SSE we must return a `StreamingHttpResponse` and not an `HttpResponse`
+@authenticate_headless
 async def sse_agent_status(request: HttpRequest) -> StreamingHttpResponse:
     """
-    A view that streams agent connection status and service updates
+    Streams agent connection status and service updates
     using Server-Sent Events.
     """
-    # Resolve request.user and its properties in an async-safe way
-    # request.user is a SimpleLazyObject that performs synchronous operations
-    # when its properties (like is_authenticated or id) are accessed.
-    # We need to ensure this resolution happens in a thread.
-    user = await sync_to_async(lambda: request.user)()
-    is_authenticated = await sync_to_async(lambda: user.is_authenticated)()
-
-    # TODO: The following workaround exposes the user Token on the URL. We should
-    # create a unique endpoint for each agent SSE that doesn't require authentication.
-    # (Web SSE workaround)
-    # If not authenticated via headers/session, check for token in query params
-    if not is_authenticated:
-        token = request.GET.get("token")
-        if token:
-            try:
-                from django.contrib.auth.models import User
-                from rest_framework_simplejwt.tokens import AccessToken
-
-                # Validate token
-                access_token = AccessToken(token)
-                user_id = access_token["user_id"]
-
-                # Fetch user
-                user = await sync_to_async(User.objects.get)(id=user_id)
-                is_authenticated = True
-            except Exception:
-                # Token invalid or user not found
-                pass
-
+    user = await request.auser()
+    is_authenticated = user.is_authenticated
     if not is_authenticated:
         return StreamingHttpResponse(
             [
@@ -337,7 +318,7 @@ async def sse_agent_status(request: HttpRequest) -> StreamingHttpResponse:
         )
 
     # Dynamically define a group name based on the authenticated user's ID
-    user_id = await sync_to_async(lambda: user.id)()
+    user_id = user.pk
     USER_AGENT_STATUS_GROUP_NAME = f"user_{user_id}_agent_status_updates"
 
     async def event_stream() -> AsyncGenerator[bytes, None]:
@@ -360,8 +341,9 @@ async def sse_agent_status(request: HttpRequest) -> StreamingHttpResponse:
             # so passing `user` is fine.
             initial_statuses = await get_all_agent_statuses(user)
             yield (
-                f"data: {json.dumps({'type': 'initial_status',
-                                     'agents': initial_statuses})}"
+                f"data: {
+                    json.dumps({'type': 'initial_status', 'agents': initial_statuses})
+                }"
                 f"\n\n"
             ).encode("utf-8")
 
