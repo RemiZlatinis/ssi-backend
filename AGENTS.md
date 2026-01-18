@@ -1,7 +1,6 @@
 # AGENTS.md — ssi-backend
 
-> **This file takes precedence over README.md when directives conflict.**
-> **Architectural intent must be preserved over convenience.**
+> **This file takes precedence over README.md when directives conflict.** > **Architectural intent must be preserved over convenience.**
 
 ---
 
@@ -140,7 +139,43 @@ AI agents **must not introduce** the following:
 
 ---
 
-## Commit Message Format
+## Development & Contribution
+
+### Pre-Commit Hooks (Required for All Contributors)
+
+This repository uses pre-commit hooks to enforce code quality standards (Black, Ruff, Mypy). **Hooks must be installed immediately after cloning the repository.**
+
+```bash
+# Install pre-commit tool
+pip install pre-commit
+
+# Initialize hooks for this repository
+pre-commit install
+```
+
+These hooks will automatically run on staged files during `git commit`. To manually verify all checks before committing:
+
+```bash
+# Run all checks on all files
+pre-commit run --all-files
+```
+
+If hooks fail, fix the reported issues, stage them again, and retry the commit. **Commits that fail pre-commit checks will not be allowed.**
+
+### AI Agent Conduct
+
+When working on this repository, AI agents **must**:
+
+1. Ensure pre-commit hooks are initialized in the development environment before making any commits
+2. Verify all pre-commit checks pass locally before proposing changes
+3. Never bypass or disable pre-commit hooks
+4. Include pre-commit validation in any CI/CD pipeline modifications
+
+---
+
+## Commit Guidelines
+
+**Message Format:**
 
 ```
 type(scope): short description
@@ -150,8 +185,8 @@ Optional extended body:
 - Reference related issues if applicable
 ```
 
-**Types**: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`
-**Scopes**: App names (`core`, `auth`, `notifications`) or `api`, `models`, `admin`
+**Types**: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `security`, `build`, `ci`, `style` etc.
+**Scopes**: App names (`core`, `authentication`, `notifications`) or `api`, `models`, `admin` etc.
 
 ---
 
