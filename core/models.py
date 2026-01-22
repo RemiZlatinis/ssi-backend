@@ -39,12 +39,7 @@ class Agent(models.Model):
     last_seen = models.DateTimeField(
         null=True,
         blank=True,
-        help_text="Timestamp of the last update from the agent.",
-    )
-    current_channel_name = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="The channel name of the current active WebSocket connection.",
+        help_text="Timestamp of when the agent was disconnected.",
     )
 
     class Meta:
@@ -55,21 +50,13 @@ class Agent(models.Model):
 
     def mark_connected(self) -> None:
         self.is_online = True
-        self.last_seen = timezone.now()
+        self.last_seen = None
         self.save(update_fields=["is_online", "last_seen"])
 
     def mark_disconnected(self) -> None:
         self.is_online = False
         self.last_seen = timezone.now()
         self.save(update_fields=["is_online", "last_seen"])
-
-    def update_last_seen(self) -> None:
-        self.last_seen = timezone.now()
-        update_fields = ["last_seen"]
-        if not self.is_online:
-            self.is_online = True
-            update_fields.append("is_online")
-        self.save(update_fields=update_fields)
 
 
 class Service(models.Model):
