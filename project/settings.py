@@ -7,7 +7,6 @@ from typing import Any, cast
 
 import dj_database_url
 import sentry_sdk
-from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
 ################################################################################
@@ -61,13 +60,6 @@ CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()
 ]
 
-# We include 'cache-control' to support Server-Sent Events (SSE) on browsers (Expo Web).
-# Libraries like 'react-native-sse' explicitly set 'Cache-Control: no-cache' to ensure
-# real-time delivery and prevent stream buffering. Standard browsers trigger a CORS
-# preflight for this header, requiring it to be explicitly allowed here.
-CORS_ALLOW_HEADERS = list(default_headers) + [
-    "cache-control",
-]
 
 INSTALLED_APPS = [
     # Priority apps
