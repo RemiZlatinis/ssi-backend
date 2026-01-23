@@ -1,10 +1,9 @@
 import logging
 from typing import Any
 
-import requests
+import httpx
 from django.contrib.auth import get_user_model
 from django.db import models
-from requests.exceptions import ConnectionError, HTTPError
 
 User = get_user_model()
 
@@ -54,7 +53,7 @@ class Device(models.Model):
     def __str__(self) -> str:
         return str(self.token)
 
-    def send_notification(
+    async def send_notification(
         self,
         title: str = "Title",
         body: str = "",
@@ -88,8 +87,8 @@ class Device(models.Model):
             payload["android"] = android_payload
 
         try:
-            with requests.Session() as session:
-                response = session.post(
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
                     "https://exp.host/--/api/v2/push/send",
                     headers={
                         "Accept": "application/json",
@@ -99,8 +98,8 @@ class Device(models.Model):
                     json=[payload],
                 )
                 result: dict[str, Any] = response.json()
-                logger.info(f"Notification sent to device {self.id}: {result}")
+                logger.info(f"Notification sent to device {self.pk}: {result}")
                 return result
-        except (HTTPError, ConnectionError) as e:
-            logger.error(f"Error sending notification to device {self.id}: {e}")
+        except httpx.RequestError as e:
+            logger.error(f"Error sending notification to device {self.pk}: {e}")
             return None

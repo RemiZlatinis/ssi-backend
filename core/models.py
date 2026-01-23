@@ -9,6 +9,8 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from .signals import agent_status_changed
+
 User = get_user_model()
 
 
@@ -49,14 +51,26 @@ class Agent(models.Model):
         return self.name
 
     def mark_connected(self) -> None:
+        """
+        Sets the agent.is_online to True,
+        the agent.last_seen to None,
+        and trigger the agent_status_changed signal
+        """
         self.is_online = True
         self.last_seen = None
         self.save(update_fields=["is_online", "last_seen"])
+        agent_status_changed.send(sender=self.__class__, instance=self, is_online=True)
 
     def mark_disconnected(self) -> None:
+        """
+        Sets the agent.is_online to False,
+        the agent.last_seen to timezone.now(),
+        and trigger the agent_status_changed signal
+        """
         self.is_online = False
         self.last_seen = timezone.now()
         self.save(update_fields=["is_online", "last_seen"])
+        agent_status_changed.send(sender=self.__class__, instance=self, is_online=False)
 
 
 class Service(models.Model):
