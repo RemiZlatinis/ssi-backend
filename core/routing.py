@@ -11,3 +11,10 @@ websocket_urlpatterns = [
         cast(Callable, consumers.AgentConsumer.as_asgi()),
     ),
 ]
+
+http_urlpatterns = [
+    path(
+        "api/sse/agents/",
+        cast(Callable, consumers.ClientConsumer.as_asgi()),
+    ),
+]

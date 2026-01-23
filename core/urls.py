@@ -9,7 +9,6 @@ from .views import (
     AgentViewSet,
     CompleteAgentRegistrationView,
     InitiateAgentRegistrationView,
-    sse_agent_status,
 )
 
 router = DefaultRouter()
@@ -35,6 +34,5 @@ urlpatterns = [
     ),
     path("agents/unregister/", AgentUnregisterView.as_view(), name="agent-unregister"),
     path("agents/me/", AgentMeView.as_view(), name="agent-me"),
-    path("sse/agents/", sse_agent_status, name="sse_agent_status"),
     path("", include(router.urls)),
 ]

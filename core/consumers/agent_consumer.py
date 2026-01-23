@@ -1,0 +1,93 @@
+import json
+import logging
+import uuid
+from typing import Any
+
+from channels.db import database_sync_to_async
+from channels.generic.websocket import AsyncWebsocketConsumer
+
+from core.consumers.events import (
+    agent_event_type_adapter,
+    get_agent,
+    handle_agent_event,
+    update_agent_ip,
+)
+from core.consumers.groups import get_agent_group_name
+from core.models import Agent
+from core.utils import get_client_ip
+
+logger = logging.getLogger(__name__)
+
+
+class AgentConsumer(AsyncWebsocketConsumer):
+    """
+    Consumes a WebSocket connection from an agent.
+    """
+
+    agent: Agent | None = None
+    private_group: str | None = None
+
+    async def connect(self) -> None:
+        # Get the agent key from the URL
+        agent_key = self.scope.get("url_route", {}).get("kwargs", {}).get("agent_key")
+
+        # Validate the agent key is a valid UUID
+        try:
+            agent_key = uuid.UUID(agent_key)
+        except ValueError:
+            await self.close(code=4001, reason="Invalid agent key")
+            return
+
+        # Get the agent from the database
+        self.agent = await get_agent(agent_key)
+
+        # Verify the agent exists
+        if not self.agent:
+            await self.close(
+                code=4001,
+                reason="Invalid agent key",
+            )
+            return
+
+        # Accept the connection (We are now receiving messages from the agent)
+        await self.accept()
+
+        # Join the agent's private group
+        self.private_group = get_agent_group_name(self.agent.key)
+        await self.channel_layer.group_add(self.private_group, self.channel_name)
+
+        # Update the agent's IP
+        await update_agent_ip(agent=self.agent, new_ip=get_client_ip(self.scope))
+
+    async def receive(
+        self,
+        text_data: str | None = None,
+        bytes_data: bytes | None = None,
+    ) -> None:
+        if not text_data or not self.agent:
+            return
+
+        try:
+            # Parsing and validate incoming event payload dynamically
+            event = agent_event_type_adapter.validate_json(text_data)
+
+            await handle_agent_event(self.agent, event)
+        except json.JSONDecodeError:
+            logger.warning(f"Invalid JSON from agent {self.agent.pk}")
+        except Exception as e:
+            logger.error(f"Error in AgentConsumer.receive: {e}", exc_info=True)
+
+    async def disconnect(self, code: int) -> None:
+        # Leave the agent's private group
+        if self.private_group:
+            await self.channel_layer.group_discard(
+                self.private_group, self.channel_name
+            )
+
+        if self.agent:
+            # I will remember that.
+            await database_sync_to_async(self.agent.mark_disconnected)()
+
+    async def force_disconnect(self, event: dict[str, Any]) -> None:
+        """Handler for 'force.disconnect' event sent via Channel Layer."""
+        await self.close(code=4001)
