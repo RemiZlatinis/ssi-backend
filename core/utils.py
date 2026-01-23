@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 from typing import Any, cast
 
 from django.http import HttpRequest
 
 
 def get_client_ip(
-    scope_or_request: HttpRequest | dict[str, Any],
+    scope_or_request: HttpRequest | Any,
 ) -> str | None:
     """
     Get the client's real IP address from a request or a WebSocket scope.
@@ -28,21 +26,18 @@ def get_client_ip(
             return cast(str, x_forwarded_for).split(",")[0].strip()
         return scope_or_request.META.get("REMOTE_ADDR")
 
-    # Check if it's a Channels scope object
-    elif isinstance(scope_or_request, dict):
-        if "headers" in scope_or_request:
-            headers_list = scope_or_request.get("headers", [])
-            headers = dict(cast(list[tuple[bytes, bytes]], headers_list))
-            x_forwarded_for = headers.get(b"x-forwarded-for")
-            if x_forwarded_for:
-                return x_forwarded_for.decode("utf-8").split(",")[0].strip()
+    # Otherwise, treat it as a Channels scope (dict-like)
+    if "headers" in scope_or_request:
+        headers_list = scope_or_request.get("headers", [])
+        headers = dict(cast(list[tuple[bytes, bytes]], headers_list))
+        x_forwarded_for = headers.get(b"x-forwarded-for")
+        if x_forwarded_for:
+            return x_forwarded_for.decode("utf-8").split(",")[0].strip()
 
-        # Fallback to client info if available
-        client_info = scope_or_request.get("client", (None, None))
-        ip_tuple = cast(tuple[str | None, int | None], client_info)
-        return ip_tuple[0]
-
-    return None
+    # Fallback to client info if available
+    client_info = scope_or_request.get("client", (None, None))
+    ip_tuple = cast(tuple[str | None, int | None], client_info)
+    return ip_tuple[0]
 
 
 def get_static_icon_url(icon_name: str) -> str:
