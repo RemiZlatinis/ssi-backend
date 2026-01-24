@@ -1,5 +1,6 @@
 from typing import Any, cast
 
+from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User as DjangoUser
 from django.db.models import QuerySet
@@ -28,13 +29,12 @@ class DeviceViewSet(viewsets.ModelViewSet):
         """Sends a test notification to the requested device"""
         device = self.get_object()  # This applies permissions
         try:
-            return Response(
-                device.send_notification(
-                    title="Push Notification Test",
-                    body="If you are seeing this, that means the push notifications"
-                    " are working correctly with this device",
-                )
+            result = async_to_sync(device.send_notification)(
+                title="Push Notification Test",
+                body="If you are seeing this, that means the push notifications"
+                " are working correctly with this device",
             )
+            return Response(result)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 

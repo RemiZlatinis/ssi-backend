@@ -1,5 +1,6 @@
 from typing import Any
 
+from asgiref.sync import async_to_sync
 from django.contrib import admin, messages
 from django.http import HttpRequest, HttpResponseRedirect
 from django.urls import path, reverse
@@ -59,7 +60,7 @@ class DeviceAdmin(admin.ModelAdmin):
     ) -> HttpResponseRedirect:
         device = self.get_object(request, object_id)
         if device:
-            result = device.send_notification(
+            result = async_to_sync(device.send_notification)(
                 title="Push Notification Test",
                 body="If you are seeing this, that means the push notifications"
                 " are working correctly with this device",
