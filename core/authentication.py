@@ -5,7 +5,6 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.request import Request
 
 from .models import Agent
-from .utils import get_client_ip
 
 
 class AgentAuthentication(BaseAuthentication):
@@ -31,11 +30,5 @@ class AgentAuthentication(BaseAuthentication):
             )
         except (IndexError, Agent.DoesNotExist):
             raise AuthenticationFailed("Invalid or not registered agent key.")
-
-        # Update IP address on successful authentication
-        current_ip = get_client_ip(request)
-        if agent.ip_address != current_ip:
-            agent.ip_address = current_ip
-            agent.save(update_fields=["ip_address"])
 
         return (agent.owner, agent)
