@@ -20,8 +20,96 @@ Debug Dashboard{% endblock %} {% block extra_css %}
 
   .event-entry {
     margin-bottom: 0.5rem;
-    padding: 0.25rem;
+    padding: 0.5rem;
     border-radius: 3px;
+    position: relative;
+  }
+
+  .event-entry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .event-entry-meta {
+    flex: 1;
+  }
+
+  .event-format-btn {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #9ca3af;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    line-height: 1;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .event-format-btn:hover {
+    background: #334155;
+    color: #f1f5f9;
+    border-color: #64748b;
+  }
+
+  .event-data {
+    margin-top: 0.25rem;
+    word-break: break-word;
+  }
+
+  .event-data.formatted {
+    background: #0f172a;
+    padding: 0.5rem;
+    border-radius: 4px;
+    border: 1px solid #334155;
+  }
+
+  .event-data.formatted .formatted-row {
+    display: flex;
+    padding: 0.15rem 0;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .event-data.formatted .formatted-row:last-child {
+    border-bottom: none;
+  }
+
+  .event-data.formatted .formatted-key {
+    color: #60a5fa;
+    font-weight: 500;
+    min-width: 120px;
+    padding-right: 0.5rem;
+  }
+
+  .event-data.formatted .formatted-value {
+    color: #f0f0f0;
+    flex: 1;
+  }
+
+  .event-data.formatted .formatted-value.string {
+    color: #10b981;
+  }
+
+  .event-data.formatted .formatted-value.number {
+    color: #f59e0b;
+  }
+
+  .event-data.formatted .formatted-value.boolean {
+    color: #ec4899;
+  }
+
+  .event-data.formatted .formatted-value.null {
+    color: #6b7280;
+    font-style: italic;
+  }
+
+  .event-data.formatted .formatted-nested {
+    border-left: 2px solid #334155;
+    padding-left: 0.5rem;
+    margin: 0.25rem 0;
   }
 
   .event-agent {
@@ -500,6 +588,7 @@ Debug Dashboard{% endblock %} {% block extra_css %}
 
       let sourceCard;
       let title;
+      let eventContainerId;
 
       switch (cardType) {
         case "services":
@@ -509,10 +598,12 @@ Debug Dashboard{% endblock %} {% block extra_css %}
         case "agent-events":
           sourceCard = document.getElementById("card-agent-events");
           title = "📨 Agent Events (Live)";
+          eventContainerId = "agent-events";
           break;
         case "client-events":
           sourceCard = document.getElementById("card-client-events");
           title = "📤 Client Events (Live)";
+          eventContainerId = "client-events";
           break;
         default:
           return;
@@ -539,9 +630,72 @@ Debug Dashboard{% endblock %} {% block extra_css %}
       clonedContent.style.padding = "0";
       clonedContent.style.margin = "0";
 
+      // For event logs, we need to sync content from original and set up mutation observer
+      if (eventContainerId) {
+        const originalContainer = document.getElementById(eventContainerId);
+        const modalContainer = clonedContent.querySelector(
+          `#${eventContainerId}`,
+        );
+        if (originalContainer && modalContainer) {
+          // Copy current content
+          modalContainer.innerHTML = originalContainer.innerHTML;
+          // Re-attach event listeners to format buttons in modal
+          this.attachFormatListeners(modalContainer);
+        }
+      }
+
       // Show modal
       modalOverlay.classList.add("active");
       document.body.style.overflow = "hidden"; // Prevent background scrolling
+    }
+
+    attachFormatListeners(container) {
+      const events = container.querySelectorAll(".event-entry");
+      events.forEach((eventDiv) => {
+        const btn = eventDiv.querySelector(".event-format-btn");
+        const dataDiv = eventDiv.querySelector(".event-data");
+        if (!btn || !dataDiv) return;
+
+        // Get the current content as raw data
+        const isRaw = dataDiv.classList.contains("raw");
+        let rawDataStr, formattedDataStr;
+
+        if (isRaw) {
+          rawDataStr = dataDiv.textContent;
+          // Try to parse and format the data
+          try {
+            const data = JSON.parse(rawDataStr);
+            formattedDataStr = this.formatEventData(data);
+          } catch (e) {
+            formattedDataStr = rawDataStr;
+          }
+        } else {
+          formattedDataStr = dataDiv.innerHTML;
+          // Try to reconstruct raw from formatted (best effort)
+          rawDataStr = dataDiv.textContent;
+        }
+
+        // Remove old listeners by cloning the button
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+
+        // Add new click listener
+        newBtn.addEventListener("click", () => {
+          if (dataDiv.classList.contains("raw")) {
+            dataDiv.innerHTML = formattedDataStr;
+            dataDiv.classList.remove("raw");
+            dataDiv.classList.add("formatted");
+            newBtn.textContent = "🔧";
+            newBtn.title = "Show raw";
+          } else {
+            dataDiv.textContent = rawDataStr;
+            dataDiv.classList.remove("formatted");
+            dataDiv.classList.add("raw");
+            newBtn.textContent = "📋";
+            newBtn.title = "Show formatted";
+          }
+        });
+      });
     }
 
     closeModal(event) {
@@ -818,12 +972,59 @@ Debug Dashboard{% endblock %} {% block extra_css %}
         ? new Date(eventData.timestamp).toLocaleTimeString()
         : new Date().toLocaleTimeString();
 
-      const dataStr = eventData.data
-        ? JSON.stringify(eventData.data, null, 2)
+      const eventId = `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const hasData = eventData.data && typeof eventData.data === "object";
+      const rawDataStr = hasData ? JSON.stringify(eventData.data) : "";
+      const formattedDataStr = hasData
+        ? this.formatEventData(eventData.data)
         : "";
-      const eventHtml = `<div class="event-entry event-${eventData.source}"><span class="event-time">[${timestamp}]</span> <span class="event-type">${eventData.event_type || "unknown"}</span>${dataStr ? `: ${dataStr}` : ""}</div>`;
 
-      container.innerHTML = eventHtml + container.innerHTML;
+      // Create event element
+      const eventDiv = document.createElement("div");
+      eventDiv.className = `event-entry event-${eventData.source}`;
+      eventDiv.id = eventId;
+
+      let html = `
+        <div class="event-entry-header">
+          <div class="event-entry-meta">
+            <span class="event-time">[${timestamp}]</span>
+            <span class="event-type">${eventData.event_type || "unknown"}</span>
+          </div>`;
+
+      if (hasData) {
+        html += `<button class="event-format-btn" title="Show formatted">📋</button>`;
+      }
+
+      html += `</div>`;
+
+      if (hasData) {
+        html += `<div class="event-data raw">${this.escapeHtml(rawDataStr)}</div>`;
+      }
+
+      eventDiv.innerHTML = html;
+
+      // Add click handler for format button
+      if (hasData) {
+        const btn = eventDiv.querySelector(".event-format-btn");
+        const dataDiv = eventDiv.querySelector(".event-data");
+        btn.addEventListener("click", () => {
+          if (dataDiv.classList.contains("raw")) {
+            dataDiv.innerHTML = formattedDataStr;
+            dataDiv.classList.remove("raw");
+            dataDiv.classList.add("formatted");
+            btn.textContent = "🔧";
+            btn.title = "Show raw";
+          } else {
+            dataDiv.textContent = rawDataStr;
+            dataDiv.classList.remove("formatted");
+            dataDiv.classList.add("raw");
+            btn.textContent = "📋";
+            btn.title = "Show formatted";
+          }
+        });
+      }
+
+      container.insertBefore(eventDiv, container.firstChild);
 
       // Auto-scroll to top (newest at top)
       container.scrollTop = 0;
@@ -833,6 +1034,94 @@ Debug Dashboard{% endblock %} {% block extra_css %}
       if (events.length > 100) {
         events[events.length - 1].remove();
       }
+    }
+
+    escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    formatEventData(data, indent = 0) {
+      if (typeof data !== "object" || data === null) {
+        return String(data);
+      }
+
+      let html = "";
+      for (const [key, value] of Object.entries(data)) {
+        const valueType = typeof value;
+        let valueClass = "string";
+        let displayValue = value;
+
+        if (value === null) {
+          valueClass = "null";
+          displayValue = "null";
+        } else if (valueType === "number") {
+          valueClass = "number";
+        } else if (valueType === "boolean") {
+          valueClass = "boolean";
+        } else if (valueType === "object") {
+          // Recursively format nested objects
+          if (Array.isArray(value)) {
+            displayValue = `[Array(${value.length})]`;
+          } else {
+            displayValue = "{Object}";
+          }
+        } else {
+          displayValue = String(value);
+        }
+
+        html += `<div class="formatted-row"><span class="formatted-key">${key}:</span><span class="formatted-value ${valueClass}">${displayValue}</span></div>`;
+
+        // If value is an object/array, expand it below
+        if (valueType === "object" && value !== null) {
+          const nestedHtml = this.formatNestedObject(value, 1);
+          if (nestedHtml) {
+            html += `<div class="formatted-nested">${nestedHtml}</div>`;
+          }
+        }
+      }
+      return html;
+    }
+
+    formatNestedObject(obj, indent) {
+      if (typeof obj !== "object" || obj === null) {
+        return this.escapeHtml(String(obj));
+      }
+
+      let html = "";
+      const indentStyle = `margin-left: ${indent * 20}px;`;
+
+      if (Array.isArray(obj)) {
+        obj.forEach((item, index) => {
+          if (typeof item === "object" && item !== null) {
+            html += `<div style="${indentStyle}"><span class="formatted-key">[${index}]:</span></div>`;
+            html += `<div class="formatted-nested" style="${indentStyle}">${this.formatNestedObject(item, indent + 1)}</div>`;
+          } else {
+            const itemClass = this.getValueClass(item);
+            html += `<div style="${indentStyle}"><span class="formatted-key">[${index}]:</span> <span class="formatted-value ${itemClass}">${this.escapeHtml(String(item))}</span></div>`;
+          }
+        });
+      } else {
+        for (const [key, value] of Object.entries(obj)) {
+          if (typeof value === "object" && value !== null) {
+            html += `<div style="${indentStyle}"><span class="formatted-key">${key}:</span></div>`;
+            html += `<div class="formatted-nested" style="${indentStyle}">${this.formatNestedObject(value, indent + 1)}</div>`;
+          } else {
+            const valueClass = this.getValueClass(value);
+            html += `<div style="${indentStyle}"><span class="formatted-key">${key}:</span> <span class="formatted-value ${valueClass}">${this.escapeHtml(String(value))}</span></div>`;
+          }
+        }
+      }
+      return html;
+    }
+
+    getValueClass(value) {
+      if (value === null) return "null";
+      const type = typeof value;
+      if (type === "number") return "number";
+      if (type === "boolean") return "boolean";
+      return "string";
     }
 
     updateConnectionStatus(message, isConnected) {
