@@ -1,0 +1,229 @@
+{% extends "dev_debug/base.html" %}
+
+{% block title %}Agent List - SSI Debug Dashboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="flex justify-between mb-4">
+        <h2>🤖 Agent Overview</h2>
+        <div class="flex">
+            <span class="status-indicator status-online">{{ online_agents }} Online</span>
+            <span class="status-indicator status-offline ml-2">{{ total_agents|add:"-"|add:online_agents }} Offline</span>
+        </div>
+    </div>
+    
+    <div class="grid grid-3 mb-4">
+        <div class="text-center">
+            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">{{ total_agents }}</div>
+            <div class="text-sm text-gray-500">Total Agents</div>
+        </div>
+        <div class="text-center">
+            <div style="font-size: 2rem; font-weight: bold; color: #10b981;">{{ online_agents }}</div>
+            <div class="text-sm text-gray-500">Online Now</div>
+        </div>
+        <div class="text-center">
+            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">{{ pending_agents }}</div>
+            <div class="text-sm text-gray-500">Pending Registration</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2 class="mb-4">📋 Agent List</h2>
+    <div id="agent-list">
+        {% for agent in agents %}
+        <div class="agent-item mb-3 p-3 border rounded" data-agent-id="{{ agent.key }}">
+            <div class="flex justify-between">
+                <div>
+                    <h3 class="mb-1">
+                        <a href="{% url 'dev_debug:agent_detail' agent.key %}" class="btn btn-primary">
+                            {{ agent.name }}
+                        </a>
+                        {% if agent.is_online %}
+                            <span class="status-indicator status-online">Online</span>
+                        {% else %}
+                            <span class="status-indicator status-offline">Offline</span>
+                        {% endif %}
+                    </h3>
+                    <div class="text-sm text-gray-500">
+                        Owner: {{ agent.owner.username }} | 
+                        IP: {{ agent.ip_address|default:"Unknown" }} |
+                        Services: {{ agent.services.count }}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        Registered: {{ agent.created_at|date:"Y-m-d H:i" }} |
+                        Last seen: {{ agent.last_seen|date:"Y-m-d H:i"|default:"Never" }}
+                    </div>
+                </div>
+                <div>
+                    <span class="status-indicator 
+                        {% if agent.registration_status == 'registered' %}status-online
+                        {% elif agent.registration_status == 'pending' %}status-pending
+                        {% else %}status-offline{% endif %}">
+                        {{ agent.get_registration_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center text-gray-500 py-8">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
+            <h3>No agents found</h3>
+            <p class="text-sm mt-2">Register some agents to see them here.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="flex justify-between">
+        <h3>🔄 Live Updates</h3>
+        <div>
+            <span id="update-status" class="text-sm text-gray-500">Updating...</span>
+            <button id="pause-updates" class="btn btn-secondary ml-2">Pause</button>
+        </div>
+    </div>
+    <div class="text-sm text-gray-500 mt-2">
+        Last update: <span id="last-update">Never</span> | 
+        Updates per second: 1
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+class AgentListDashboard {
+    constructor() {
+        this.isUpdating = true;
+        this.updateInterval = null;
+        this.init();
+    }
+
+    init() {
+        this.startPolling();
+        this.setupEventListeners();
+        this.updateLastUpdateTime();
+    }
+
+    setupEventListeners() {
+        const pauseBtn = document.getElementById('pause-updates');
+        pauseBtn.addEventListener('click', () => {
+            if (this.isUpdating) {
+                this.stopPolling();
+                pauseBtn.textContent = 'Resume';
+                pauseBtn.classList.remove('btn-secondary');
+                pauseBtn.classList.add('btn-primary');
+                document.getElementById('update-status').textContent = 'Paused';
+            } else {
+                this.startPolling();
+                pauseBtn.textContent = 'Pause';
+                pauseBtn.classList.remove('btn-primary');
+                pauseBtn.classList.add('btn-secondary');
+                document.getElementById('update-status').textContent = 'Updating...';
+            }
+        });
+    }
+
+    startPolling() {
+        this.isUpdating = true;
+        this.updateInterval = setInterval(() => {
+            this.fetchAgentData();
+        }, 1000); // 1 second polling
+    }
+
+    stopPolling() {
+        this.isUpdating = false;
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+    }
+
+    async fetchAgentData() {
+        try {
+            const response = await fetch('/dev-debug/api/agents/');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.updateAgentList(data.agents);
+            this.updateLastUpdateTime();
+        } catch (error) {
+            console.error('Error fetching agent data:', error);
+            document.getElementById('update-status').textContent = 'Error fetching data';
+        }
+    }
+
+    updateAgentList(agents) {
+        const agentList = document.getElementById('agent-list');
+        
+        if (agents.length === 0) {
+            agentList.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🤖</div>
+                    <h3>No agents found</h3>
+                    <p class="text-sm mt-2">Register some agents to see them here.</p>
+                </div>
+            `;
+            return;
+        }
+
+        agentList.innerHTML = agents.map(agent => `
+            <div class="agent-item mb-3 p-3 border rounded" data-agent-id="${agent.id}">
+                <div class="flex justify-between">
+                    <div>
+                        <h3 class="mb-1">
+                            <a href="/dev-debug/agent/${agent.id}/" class="btn btn-primary">
+                                ${agent.name}
+                            </a>
+                            ${agent.is_online 
+                                ? '<span class="status-indicator status-online">Online</span>' 
+                                : '<span class="status-indicator status-offline">Offline</span>'
+                            }
+                        </h3>
+                        <div class="text-sm text-gray-500">
+                            Owner: ${agent.owner} | 
+                            IP: ${agent.ip_address || 'Unknown'} |
+                            Services: ${agent.services.length}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            Registered: ${new Date(agent.created_at).toLocaleString()} |
+                            Last seen: ${agent.last_seen ? new Date(agent.last_seen).toLocaleString() : 'Never'}
+                        </div>
+                    </div>
+                    <div>
+                        <span class="status-indicator ${this.getRegistrationStatusClass(agent.registration_status)}">
+                            ${this.formatRegistrationStatus(agent.registration_status)}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    getRegistrationStatusClass(status) {
+        switch (status) {
+            case 'registered': return 'status-online';
+            case 'pending': return 'status-pending';
+            case 'unregistered': return 'status-offline';
+            default: return 'status-offline';
+        }
+    }
+
+    formatRegistrationStatus(status) {
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+
+    updateLastUpdateTime() {
+        const now = new Date();
+        document.getElementById('last-update').textContent = now.toLocaleTimeString();
+    }
+}
+
+// Initialize the dashboard when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    new AgentListDashboard();
+});
+</script>
+{% endblock %}

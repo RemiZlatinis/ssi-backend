@@ -99,6 +99,10 @@ INSTALLED_APPS = [
     "dbbackup_admin",
 ]
 
+# Development-only apps
+if DEBUG:
+    INSTALLED_APPS.append("dev_debug")
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "servestatic.middleware.ServeStaticMiddleware",

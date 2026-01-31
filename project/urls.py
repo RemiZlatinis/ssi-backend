@@ -6,6 +6,8 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic.base import RedirectView
 
+from project.settings import DEBUG
+
 urlpatterns = [
     # Redirect the root URL to the desired external site
     path(
@@ -26,3 +28,9 @@ urlpatterns = [
     # Health check
     path("api/health/", include("health_check.urls")),
 ]
+
+# Add development debugging URLs only in DEBUG mode
+if DEBUG:
+    urlpatterns += [
+        path("dev-debug/", include("dev_debug.urls")),
+    ]
