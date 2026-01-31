@@ -29,6 +29,20 @@
 </div>
 
 <div class="card">
+    <div class="flex justify-between">
+        <h3>🔄 Live Updates</h3>
+        <div>
+            <span id="update-status" class="text-sm text-gray-500">Paused</span>
+            <button id="poll-updates" class="btn btn-primary ml-2">Poll</button>
+        </div>
+    </div>
+    <div class="text-sm text-gray-500 mt-2">
+        Last update: <span id="last-update">Never</span> | 
+        Updates per second: 1
+    </div>
+</div>
+
+<div class="card">
     <h2 class="mb-4">📋 Agent List</h2>
     <div id="agent-list">
         {% for agent in agents %}
@@ -74,58 +88,44 @@
         {% endfor %}
     </div>
 </div>
-
-<div class="card">
-    <div class="flex justify-between">
-        <h3>🔄 Live Updates</h3>
-        <div>
-            <span id="update-status" class="text-sm text-gray-500">Updating...</span>
-            <button id="pause-updates" class="btn btn-secondary ml-2">Pause</button>
-        </div>
-    </div>
-    <div class="text-sm text-gray-500 mt-2">
-        Last update: <span id="last-update">Never</span> | 
-        Updates per second: 1
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 class AgentListDashboard {
     constructor() {
-        this.isUpdating = true;
+        this.isUpdating = false;
         this.updateInterval = null;
         this.init();
     }
 
     init() {
-        this.startPolling();
         this.setupEventListeners();
         this.updateLastUpdateTime();
     }
 
     setupEventListeners() {
-        const pauseBtn = document.getElementById('pause-updates');
-        pauseBtn.addEventListener('click', () => {
+        const pollBtn = document.getElementById('poll-updates');
+        pollBtn.addEventListener('click', () => {
             if (this.isUpdating) {
                 this.stopPolling();
-                pauseBtn.textContent = 'Resume';
-                pauseBtn.classList.remove('btn-secondary');
-                pauseBtn.classList.add('btn-primary');
-                document.getElementById('update-status').textContent = 'Paused';
             } else {
                 this.startPolling();
-                pauseBtn.textContent = 'Pause';
-                pauseBtn.classList.remove('btn-primary');
-                pauseBtn.classList.add('btn-secondary');
-                document.getElementById('update-status').textContent = 'Updating...';
             }
         });
     }
 
     startPolling() {
         this.isUpdating = true;
+        const pollBtn = document.getElementById('poll-updates');
+        pollBtn.textContent = 'Stop';
+        pollBtn.classList.remove('btn-primary');
+        pollBtn.classList.add('btn-secondary');
+        document.getElementById('update-status').textContent = 'Updating...';
+        
+        // Fetch immediately
+        this.fetchAgentData();
+        
         this.updateInterval = setInterval(() => {
             this.fetchAgentData();
         }, 1000); // 1 second polling
@@ -133,6 +133,12 @@ class AgentListDashboard {
 
     stopPolling() {
         this.isUpdating = false;
+        const pollBtn = document.getElementById('poll-updates');
+        pollBtn.textContent = 'Poll';
+        pollBtn.classList.remove('btn-secondary');
+        pollBtn.classList.add('btn-primary');
+        document.getElementById('update-status').textContent = 'Paused';
+        
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
