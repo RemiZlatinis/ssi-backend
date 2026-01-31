@@ -16,7 +16,6 @@ Debug Dashboard{% endblock %} {% block extra_css %}
     padding: 1rem;
     border-radius: 6px;
     overflow-y: auto;
-    white-space: pre-wrap;
   }
 
   .event-entry {
@@ -819,13 +818,10 @@ Debug Dashboard{% endblock %} {% block extra_css %}
         ? new Date(eventData.timestamp).toLocaleTimeString()
         : new Date().toLocaleTimeString();
 
-      const eventHtml = `
-            <div class="event-entry event-${eventData.source}">
-                <span class="event-time">[${timestamp}]</span>
-                <span class="event-type">${eventData.event_type || "unknown"}</span>
-                ${eventData.data ? `: ${JSON.stringify(eventData.data, null, 2)}` : ""}
-            </div>
-        `;
+      const dataStr = eventData.data
+        ? JSON.stringify(eventData.data, null, 2)
+        : "";
+      const eventHtml = `<div class="event-entry event-${eventData.source}"><span class="event-time">[${timestamp}]</span> <span class="event-type">${eventData.event_type || "unknown"}</span>${dataStr ? `: ${dataStr}` : ""}</div>`;
 
       container.innerHTML = eventHtml + container.innerHTML;
 
