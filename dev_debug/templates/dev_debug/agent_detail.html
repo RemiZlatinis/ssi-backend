@@ -1,566 +1,866 @@
-{% extends "dev_debug/base.html" %}
-
-{% block title %}{{ agent.name }} - SSI Debug Dashboard{% endblock %}
-
-{% block extra_css %}
+{% extends "dev_debug/base.html" %} {% block title %}{{ agent.name }} - SSI
+Debug Dashboard{% endblock %} {% block extra_css %}
 <style>
-    .detail-section {
-        min-height: 400px;
-        max-height: 600px;
-        overflow-y: auto;
-    }
-    
-    .event-log {
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        font-size: 0.8rem;
-        line-height: 1.4;
-        background-color: #1a1a1a;
-        color: #f0f0f0;
-        padding: 1rem;
-        border-radius: 6px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-    }
-    
-    .event-entry {
-        margin-bottom: 0.5rem;
-        padding: 0.25rem;
-        border-radius: 3px;
-    }
-    
-    .event-agent {
-        background-color: rgba(59, 130, 246, 0.1);
-        border-left: 3px solid #3b82f6;
-    }
-    
-    .event-client {
-        background-color: rgba(16, 185, 129, 0.1);
-        border-left: 3px solid #10b981;
-    }
-    
-    .event-system {
-        background-color: rgba(245, 158, 11, 0.1);
-        border-left: 3px solid #f59e0b;
-    }
-    
-    .event-time {
-        color: #9ca3af;
-        font-size: 0.75rem;
-    }
-    
-    .event-type {
-        color: #60a5fa;
-        font-weight: bold;
-    }
-    
-    .service-item {
-        padding: 0.75rem;
-        border: 1px solid #475569;
-        border-radius: 6px;
-        margin-bottom: 0.5rem;
-        background-color: #1e293b;
-    }
-    
-    .service-status {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: bold;
-        text-transform: uppercase;
-    }
-    
-    .status-ok { background-color: #10b981; color: white; }
-    .status-warning { background-color: #f59e0b; color: white; }
-    .status-error { background-color: #ef4444; color: white; }
-    .status-failure { background-color: #dc2626; color: white; }
-    .status-update { background-color: #3b82f6; color: white; }
-    .status-unknown { background-color: #6b7280; color: white; }
-    
-    .timestamp {
-        color: #6b7280;
-        font-size: 0.875rem;
-    }
-    
-    .badge {
-        display: inline-block;
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-    
-    .badge-primary { background-color: #1e3a8a; color: #dbeafe; }
-    .badge-secondary { background-color: #374151; color: #d1d5db; }
-    
-    .controls {
-        position: sticky;
-        top: 0;
-        background: #1e293b;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid #475569;
-        margin-bottom: 1rem;
-        z-index: 10;
-    }
-</style>
-{% endblock %}
+  .detail-section {
+    min-height: 400px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
 
-{% block content %}
+  .event-log {
+    font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    background-color: #1a1a1a;
+    color: #f0f0f0;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+
+  .event-entry {
+    margin-bottom: 0.5rem;
+    padding: 0.25rem;
+    border-radius: 3px;
+  }
+
+  .event-agent {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+  }
+
+  .event-client {
+    background-color: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid #10b981;
+  }
+
+  .event-system {
+    background-color: rgba(245, 158, 11, 0.1);
+    border-left: 3px solid #f59e0b;
+  }
+
+  .event-time {
+    color: #9ca3af;
+    font-size: 0.75rem;
+  }
+
+  .event-type {
+    color: #60a5fa;
+    font-weight: bold;
+  }
+
+  .service-item {
+    padding: 0.75rem;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    background-color: #1e293b;
+  }
+
+  .service-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .status-ok {
+    background-color: #10b981;
+    color: white;
+  }
+  .status-warning {
+    background-color: #f59e0b;
+    color: white;
+  }
+  .status-error {
+    background-color: #ef4444;
+    color: white;
+  }
+  .status-failure {
+    background-color: #dc2626;
+    color: white;
+  }
+  .status-update {
+    background-color: #3b82f6;
+    color: white;
+  }
+  .status-unknown {
+    background-color: #6b7280;
+    color: white;
+  }
+
+  .timestamp {
+    color: #6b7280;
+    font-size: 0.875rem;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge-primary {
+    background-color: #1e3a8a;
+    color: #dbeafe;
+  }
+  .badge-secondary {
+    background-color: #374151;
+    color: #d1d5db;
+  }
+
+  .controls {
+    position: sticky;
+    top: 0;
+    background: #1e293b;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #475569;
+    margin-bottom: 1rem;
+    z-index: 10;
+  }
+
+  /* Modal/Expand styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 2000;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .modal-card {
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    border: 1px solid #475569;
+    width: 100%;
+    max-width: 1200px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    animation: modalSlideIn 0.2s ease-out;
+  }
+
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #475569;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+  }
+
+  .modal-content {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-content .detail-section,
+  .modal-content .event-log {
+    max-height: none;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .expand-btn {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #9ca3af;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    transition: all 0.2s;
+  }
+
+  .expand-btn:hover {
+    background: #334155;
+    color: #f1f5f9;
+    border-color: #64748b;
+  }
+
+  .close-modal-btn {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #9ca3af;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+  }
+
+  .close-modal-btn:hover {
+    background: #334155;
+    color: #f1f5f9;
+    border-color: #64748b;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .card-header h3 {
+    margin: 0;
+  }
+</style>
+{% endblock %} {% block content %}
 <!-- Connection Status Indicator -->
 <div id="connection-status" class="connection-status connection-connecting">
-    Connecting...
+  Connecting...
 </div>
 
 <!-- Manual Reconnect Button -->
-<div style="position: fixed; top: 70px; right: 20px; z-index: 1000;">
-    <button id="manual-reconnect" class="btn btn-secondary" onclick="agentDetailDashboard.manualReconnect()" style="display: none;">
-        🔄 Reconnect
-    </button>
+<div style="position: fixed; top: 70px; right: 20px; z-index: 1000">
+  <button
+    id="manual-reconnect"
+    class="btn btn-secondary"
+    onclick="agentDetailDashboard.manualReconnect()"
+    style="display: none"
+  >
+    🔄 Reconnect
+  </button>
 </div>
 
 <!-- Agent Header -->
 <div class="card">
-    <div class="flex justify-between">
-        <div>
-            <h2 class="mb-1">🤖 {{ agent.name }}</h2>
-            <div class="text-sm text-gray-500">
-                Owner: {{ agent.owner.username }} | 
-                Key: {{ agent.key }}
-            </div>
-        </div>
-        <div>
-            {% if agent.is_online %}
-                <span class="status-indicator status-online">Online</span>
-            {% else %}
-                <span class="status-indicator status-offline">Offline</span>
-            {% endif %}
-            <span class="status-indicator 
-                {% if agent.registration_status == 'registered' %}status-online
-                {% elif agent.registration_status == 'pending' %}status-pending
-                {% else %}status-offline{% endif %} ml-2">
-                {{ agent.get_registration_status_display }}
-            </span>
-        </div>
+  <div class="flex justify-between">
+    <div>
+      <h2 class="mb-1">🤖 {{ agent.name }}</h2>
+      <div class="text-sm text-gray-500">
+        Owner: {{ agent.owner.username }} | Key: {{ agent.key }}
+      </div>
     </div>
-    
-    <div class="grid grid-3 mt-4">
-        <div>
-            <div class="badge badge-primary">IP Address</div>
-            <div>{{ agent.ip_address|default:"Unknown" }}</div>
-        </div>
-        <div>
-            <div class="badge badge-primary">Created</div>
-            <div>{{ agent.created_at|date:"Y-m-d H:i" }}</div>
-        </div>
-        <div>
-            <div class="badge badge-primary">Last Seen</div>
-            <div>{{ agent.last_seen|date:"Y-m-d H:i"|default:"Never" }}</div>
-        </div>
+    <div>
+      {% if agent.is_online %}
+      <span class="status-indicator status-online">Online</span>
+      {% else %}
+      <span class="status-indicator status-offline">Offline</span>
+      {% endif %}
+      <span
+        class="status-indicator {% if agent.registration_status == 'registered' %}status-online {% elif agent.registration_status == 'pending' %}status-pending {% else %}status-offline{% endif %} ml-2"
+      >
+        {{ agent.get_registration_status_display }}
+      </span>
     </div>
+  </div>
+
+  <div class="grid grid-3 mt-4">
+    <div>
+      <div class="badge badge-primary">IP Address</div>
+      <div>{{ agent.ip_address|default:"Unknown" }}</div>
+    </div>
+    <div>
+      <div class="badge badge-primary">Created</div>
+      <div>{{ agent.created_at|date:"Y-m-d H:i" }}</div>
+    </div>
+    <div>
+      <div class="badge badge-primary">Last Seen</div>
+      <div>{{ agent.last_seen|date:"Y-m-d H:i"|default:"Never" }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Overlay for Expanded View -->
+<div
+  id="modal-overlay"
+  class="modal-overlay"
+  onclick="agentDetailDashboard.closeModal(event)"
+>
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3 id="modal-title">Modal Title</h3>
+      <button
+        class="close-modal-btn"
+        onclick="agentDetailDashboard.closeModal()"
+      >
+        ✕ Close
+      </button>
+    </div>
+    <div id="modal-body" class="modal-content">
+      <!-- Modal content will be injected here -->
+    </div>
+  </div>
 </div>
 
 <!-- Three Section Layout -->
 <div class="grid grid-3">
-    <!-- Section 1: Agent Details & Services (Polling) -->
-    <div class="card">
-        <h3>📊 Agent Details & Services</h3>
-        <div class="controls">
-            <div class="flex justify-between">
-                <span id="status-update-time" class="timestamp">Last update: Never</span>
-                <div>
-                    <button id="polling" class="btn btn-primary">Poll</button>
-                    <button id="clear-services" class="btn btn-secondary ml-2">Clear</button>
-                </div>
-            </div>
+  <!-- Section 1: Agent Details & Services (Polling) -->
+  <div class="card" id="card-services">
+    <div class="card-header">
+      <h3>📊 Agent Details & Services</h3>
+      <button
+        class="expand-btn"
+        onclick="agentDetailDashboard.expandCard('services')"
+        title="Expand"
+      >
+        ⛶
+      </button>
+    </div>
+    <div class="controls">
+      <div class="flex justify-between">
+        <span id="status-update-time" class="timestamp"
+          >Last update: Never</span
+        >
+        <div>
+          <button id="polling" class="btn btn-primary">Poll</button>
+          <button id="clear-services" class="btn btn-secondary ml-2">
+            Clear
+          </button>
         </div>
-        
-        <div id="agent-services" class="detail-section">
-            <h4 class="mb-2">Services ({{ services.count }})</h4>
-            {% for service in services %}
-            <div class="service-item">
-                <div class="flex justify-between">
-                    <div>
-                        <strong>{{ service.name }}</strong>
-                        <div class="text-sm text-gray-500">{{ service.description|default:"No description" }}</div>
-                        <div class="text-xs text-gray-500 mt-1">
-                            ID: {{ service.agent_service_id }} 
-                            {% if service.version %}| Version: {{ service.version }}{% endif %}
-                            {% if service.schedule %}| Schedule: {{ service.schedule }}{% endif %}
-                        </div>
-                    </div>
-                    <div>
-                        <span class="service-status status-{{ service.last_status|lower }}">
-                            {{ service.last_status }}
-                        </span>
-                    </div>
-                </div>
-                {% if service.last_message %}
-                <div class="mt-2 p-2 bg-gray-100 rounded text-xs">
-                    <strong>Message:</strong> {{ service.last_message }}
-                </div>
-                {% endif %}
-                <div class="text-xs text-gray-500 mt-2">
-                    Last update: {{ service.last_seen|date:"Y-m-d H:i"|default:"Never" }}
-                </div>
-            </div>
-            {% empty %}
-            <div class="text-center text-gray-500 py-4">
-                <div class="text-2xl mb-2">📦</div>
-                <div>No services registered</div>
-            </div>
-            {% endfor %}
-        </div>
+      </div>
     </div>
 
-    <!-- Section 2: Agent Events (WebSocket) -->
-    <div class="card">
-        <h3>📨 Agent Events (Live)</h3>
-        <div class="controls">
-            <div class="flex justify-between">
-                <span id="agent-event-count">0 events</span>
-                <div>
-                    <button id="pause-agent-events" class="btn btn-secondary">Pause</button>
-                    <button id="clear-agent-events" class="btn btn-secondary ml-2">Clear</button>
-                </div>
+    <div id="agent-services" class="detail-section">
+      <h4 class="mb-2">Services ({{ services.count }})</h4>
+      {% for service in services %}
+      <div class="service-item">
+        <div class="flex justify-between">
+          <div>
+            <strong>{{ service.name }}</strong>
+            <div class="text-sm text-gray-500">
+              {{ service.description|default:"No description" }}
             </div>
+            <div class="text-xs text-gray-500 mt-1">
+              ID: {{ service.agent_service_id }}{% if service.version %} |
+              Version: {{ service.version }}{% endif %}{% if service.schedule %}
+              | Schedule: {{ service.schedule }}{% endif %}
+            </div>
+          </div>
+          <div>
+            <span class="service-status status-{{ service.last_status|lower }}">
+              {{ service.last_status }}
+            </span>
+          </div>
         </div>
-        
-        <div id="agent-events" class="event-log detail-section">
-            <div class="text-center text-gray-500">Waiting for agent events...</div>
+        {% if service.last_message %}
+        <div class="mt-2 p-2 bg-gray-100 rounded text-xs">
+          <strong>Message:</strong> {{ service.last_message }}
         </div>
+        {% endif %}
+        <div class="text-xs text-gray-500 mt-2">
+          Last update: {{ service.last_seen|date:"Y-m-d H:i"|default:"Never" }}
+        </div>
+      </div>
+      {% empty %}
+      <div class="text-center text-gray-500 py-4">
+        <div class="text-2xl mb-2">📦</div>
+        <div>No services registered</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Section 2: Agent Events (WebSocket) -->
+  <div class="card" id="card-agent-events">
+    <div class="card-header">
+      <h3>📨 Agent Events (Live)</h3>
+      <button
+        class="expand-btn"
+        onclick="agentDetailDashboard.expandCard('agent-events')"
+        title="Expand"
+      >
+        ⛶
+      </button>
+    </div>
+    <div class="controls">
+      <div class="flex justify-between">
+        <span id="agent-event-count">0 events</span>
+        <div>
+          <button id="pause-agent-events" class="btn btn-secondary">
+            Pause
+          </button>
+          <button id="clear-agent-events" class="btn btn-secondary ml-2">
+            Clear
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- Section 3: Client Events (WebSocket) -->
-    <div class="card">
-        <h3>📤 Client Events (Live)</h3>
-        <div class="controls">
-            <div class="flex justify-between">
-                <span id="client-event-count">0 events</span>
-                <div>
-                    <button id="pause-client-events" class="btn btn-secondary">Pause</button>
-                    <button id="clear-client-events" class="btn btn-secondary ml-2">Clear</button>
-                </div>
-            </div>
-        </div>
-        
-        <div id="client-events" class="event-log detail-section">
-            <div class="text-center text-gray-500">Waiting for client events...</div>
-        </div>
+    <div id="agent-events" class="event-log detail-section">
+      <div class="text-center text-gray-500">Waiting for agent events...</div>
     </div>
+  </div>
+
+  <!-- Section 3: Client Events (WebSocket) -->
+  <div class="card" id="card-client-events">
+    <div class="card-header">
+      <h3>📤 Client Events (Live)</h3>
+      <button
+        class="expand-btn"
+        onclick="agentDetailDashboard.expandCard('client-events')"
+        title="Expand"
+      >
+        ⛶
+      </button>
+    </div>
+    <div class="controls">
+      <div class="flex justify-between">
+        <span id="client-event-count">0 events</span>
+        <div>
+          <button id="pause-client-events" class="btn btn-secondary">
+            Pause
+          </button>
+          <button id="clear-client-events" class="btn btn-secondary ml-2">
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="client-events" class="event-log detail-section">
+      <div class="text-center text-gray-500">Waiting for client events...</div>
+    </div>
+  </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
+{% endblock %} {% block extra_js %}
 <script>
-class AgentDetailDashboard {
+  class AgentDetailDashboard {
     constructor() {
-        this.agentId = '{{ agent.key }}';
-        this.apiUrl = '{{ api_url }}';
-        this.websocketUrl = '{{ websocket_url }}';
-        
-        // Polling state
-        this.isPolling = true;
-        this.pollingInterval = null;
-        
-        // WebSocket state
-        this.ws = null;
-        this.agentEventsPaused = false;
-        this.clientEventsPaused = false;
-        
-        // Reconnection management
-        this.reconnectAttempts = 0;
-        this.reconnectTimeout = null;
-        
-        // Event counters
-        this.agentEventCount = 0;
-        this.clientEventCount = 0;
-        
-        this.init();
+      this.agentId = "{{ agent.key }}";
+      this.apiUrl = "{{ api_url }}";
+      this.websocketUrl = "{{ websocket_url }}";
+
+      // Polling state
+      this.isPolling = true;
+      this.pollingInterval = null;
+
+      // WebSocket state
+      this.ws = null;
+      this.agentEventsPaused = false;
+      this.clientEventsPaused = false;
+
+      // Reconnection management
+      this.reconnectAttempts = 0;
+      this.reconnectTimeout = null;
+
+      // Event counters
+      this.agentEventCount = 0;
+      this.clientEventCount = 0;
+
+      this.init();
     }
 
     init() {
-        // this.startPolling();
-        this.connectWebSocket();
-        this.setupEventListeners();
+      // this.startPolling();
+      this.connectWebSocket();
+      this.setupEventListeners();
+      this.setupModalListeners();
+    }
+
+    setupModalListeners() {
+      // Close modal on Escape key
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          this.closeModal();
+        }
+      });
+    }
+
+    expandCard(cardType) {
+      const modalOverlay = document.getElementById("modal-overlay");
+      const modalTitle = document.getElementById("modal-title");
+      const modalBody = document.getElementById("modal-body");
+
+      let sourceCard;
+      let title;
+
+      switch (cardType) {
+        case "services":
+          sourceCard = document.getElementById("card-services");
+          title = "📊 Agent Details & Services";
+          break;
+        case "agent-events":
+          sourceCard = document.getElementById("card-agent-events");
+          title = "📨 Agent Events (Live)";
+          break;
+        case "client-events":
+          sourceCard = document.getElementById("card-client-events");
+          title = "📤 Client Events (Live)";
+          break;
+        default:
+          return;
+      }
+
+      // Clone the card content (excluding the header with expand button)
+      const clonedContent = sourceCard.cloneNode(true);
+
+      // Remove the card-header (contains title and expand button)
+      const cardHeader = clonedContent.querySelector(".card-header");
+      if (cardHeader) {
+        cardHeader.remove();
+      }
+
+      // Update modal
+      modalTitle.textContent = title;
+      modalBody.innerHTML = "";
+      modalBody.appendChild(clonedContent);
+
+      // Remove card class styling from cloned content to avoid double borders
+      clonedContent.classList.remove("card");
+      clonedContent.style.border = "none";
+      clonedContent.style.boxShadow = "none";
+      clonedContent.style.padding = "0";
+      clonedContent.style.margin = "0";
+
+      // Show modal
+      modalOverlay.classList.add("active");
+      document.body.style.overflow = "hidden"; // Prevent background scrolling
+    }
+
+    closeModal(event) {
+      // If event is provided, only close if clicking the overlay itself (not the modal card)
+      if (event && event.target !== event.currentTarget) {
+        return;
+      }
+
+      const modalOverlay = document.getElementById("modal-overlay");
+      modalOverlay.classList.remove("active");
+      document.body.style.overflow = ""; // Restore background scrolling
     }
 
     manualReconnect() {
-        console.log('Manual reconnect triggered');
-        this.reconnectAttempts = 0; // Reset counter for manual reconnection
-        this.connectWebSocket();
+      console.log("Manual reconnect triggered");
+      this.reconnectAttempts = 0; // Reset counter for manual reconnection
+      this.connectWebSocket();
     }
 
     setupEventListeners() {
-        // Polling controls
-        document.getElementById('polling').addEventListener('click', () => {
-            if (this.isPolling) {
-                this.stopPolling();
-                document.getElementById('polling').textContent = 'Resume';
-                document.getElementById('polling').classList.remove('btn-secondary');
-                document.getElementById('polling').classList.add('btn-primary');
-            } else {
-                this.startPolling();
-                document.getElementById('polling').textContent = 'Pause';
-                document.getElementById('polling').classList.remove('btn-primary');
-                document.getElementById('polling').classList.add('btn-secondary');
-            }
+      // Polling controls
+      document.getElementById("polling").addEventListener("click", () => {
+        if (this.isPolling) {
+          this.stopPolling();
+          document.getElementById("polling").textContent = "Resume";
+          document.getElementById("polling").classList.remove("btn-secondary");
+          document.getElementById("polling").classList.add("btn-primary");
+        } else {
+          this.startPolling();
+          document.getElementById("polling").textContent = "Pause";
+          document.getElementById("polling").classList.remove("btn-primary");
+          document.getElementById("polling").classList.add("btn-secondary");
+        }
+      });
+
+      document
+        .getElementById("clear-services")
+        .addEventListener("click", () => {
+          const servicesDiv = document.getElementById("agent-services");
+          servicesDiv.innerHTML =
+            '<div class="text-center text-gray-500 py-4">Services cleared</div>';
         });
 
-        document.getElementById('clear-services').addEventListener('click', () => {
-            const servicesDiv = document.getElementById('agent-services');
-            servicesDiv.innerHTML = '<div class="text-center text-gray-500 py-4">Services cleared</div>';
+      // Agent event controls
+      document
+        .getElementById("pause-agent-events")
+        .addEventListener("click", () => {
+          this.agentEventsPaused = !this.agentEventsPaused;
+          const btn = document.getElementById("pause-agent-events");
+          btn.textContent = this.agentEventsPaused ? "Resume" : "Pause";
+          btn.classList.toggle("btn-primary");
+          btn.classList.toggle("btn-secondary");
         });
 
-        // Agent event controls
-        document.getElementById('pause-agent-events').addEventListener('click', () => {
-            this.agentEventsPaused = !this.agentEventsPaused;
-            const btn = document.getElementById('pause-agent-events');
-            btn.textContent = this.agentEventsPaused ? 'Resume' : 'Pause';
-            btn.classList.toggle('btn-primary');
-            btn.classList.toggle('btn-secondary');
+      document
+        .getElementById("clear-agent-events")
+        .addEventListener("click", () => {
+          document.getElementById("agent-events").innerHTML = "";
+          this.agentEventCount = 0;
+          this.updateEventCount("agent", 0);
         });
 
-        document.getElementById('clear-agent-events').addEventListener('click', () => {
-            document.getElementById('agent-events').innerHTML = '';
-            this.agentEventCount = 0;
-            this.updateEventCount('agent', 0);
+      // Client event controls
+      document
+        .getElementById("pause-client-events")
+        .addEventListener("click", () => {
+          this.clientEventsPaused = !this.clientEventsPaused;
+          const btn = document.getElementById("pause-client-events");
+          btn.textContent = this.clientEventsPaused ? "Resume" : "Pause";
+          btn.classList.toggle("btn-primary");
+          btn.classList.toggle("btn-secondary");
         });
 
-        // Client event controls
-        document.getElementById('pause-client-events').addEventListener('click', () => {
-            this.clientEventsPaused = !this.clientEventsPaused;
-            const btn = document.getElementById('pause-client-events');
-            btn.textContent = this.clientEventsPaused ? 'Resume' : 'Pause';
-            btn.classList.toggle('btn-primary');
-            btn.classList.toggle('btn-secondary');
-        });
-
-        document.getElementById('clear-client-events').addEventListener('click', () => {
-            document.getElementById('client-events').innerHTML = '';
-            this.clientEventCount = 0;
-            this.updateEventCount('client', 0);
+      document
+        .getElementById("clear-client-events")
+        .addEventListener("click", () => {
+          document.getElementById("client-events").innerHTML = "";
+          this.clientEventCount = 0;
+          this.updateEventCount("client", 0);
         });
     }
 
     // Polling Methods
     startPolling() {
-        this.isPolling = true;
-        this.pollingInterval = setInterval(() => {
-            this.fetchAgentData();
-        }, 1000); // 1 second polling
+      this.isPolling = true;
+      this.pollingInterval = setInterval(() => {
+        this.fetchAgentData();
+      }, 1000); // 1 second polling
     }
 
     stopPolling() {
-        this.isPolling = false;
-        if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
-            this.pollingInterval = null;
-        }
+      this.isPolling = false;
+      if (this.pollingInterval) {
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
+      }
     }
 
     async fetchAgentData() {
-        try {
-            const response = await fetch(this.apiUrl);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const agentData = await response.json();
-            this.updateAgentDetails(agentData);
-        } catch (error) {
-            console.error('Error fetching agent data:', error);
+      try {
+        const response = await fetch(this.apiUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
+
+        const agentData = await response.json();
+        this.updateAgentDetails(agentData);
+      } catch (error) {
+        console.error("Error fetching agent data:", error);
+      }
     }
 
     updateAgentDetails(agentData) {
-        const servicesDiv = document.getElementById('agent-services');
-        
-        if (!agentData.services || agentData.services.length === 0) {
-            servicesDiv.innerHTML = `
+      const servicesDiv = document.getElementById("agent-services");
+
+      if (!agentData.services || agentData.services.length === 0) {
+        servicesDiv.innerHTML = `
                 <h4 class="mb-2">Services (0)</h4>
                 <div class="text-center text-gray-500 py-4">
                     <div class="text-2xl mb-2">📦</div>
                     <div>No services registered</div>
                 </div>
             `;
-            return;
-        }
+        return;
+      }
 
-        const servicesHtml = agentData.services.map(service => `
+      const servicesHtml = agentData.services
+        .map(
+          (service) => `
             <div class="service-item">
                 <div class="flex justify-between">
                     <div>
                         <strong>${service.name}</strong>
-                        <div class="text-sm text-gray-500">${service.description || 'No description'}</div>
+                        <div class="text-sm text-gray-500">${service.description || "No description"}</div>
                         <div class="text-xs text-gray-500 mt-1">
                             ID: ${service.agent_service_id} 
-                            ${service.version ? `| Version: ${service.version}` : ''}
-                            ${service.schedule ? `| Schedule: ${service.schedule}` : ''}
+                            ${service.version ? `| Version: ${service.version}` : ""}
+                            ${service.schedule ? `| Schedule: ${service.schedule}` : ""}
                         </div>
                     </div>
                     <div>
-                        <span class="service-status status-${(service.last_status || '').toLowerCase()}">
-                            ${service.last_status || 'UNKNOWN'}
+                        <span class="service-status status-${(service.last_status || "").toLowerCase()}">
+                            ${service.last_status || "UNKNOWN"}
                         </span>
                     </div>
                 </div>
-                ${service.last_message ? `
+                ${
+                  service.last_message
+                    ? `
                 <div class="mt-2 p-2 bg-gray-100 rounded text-xs">
                     <strong>Message:</strong> ${service.last_message}
                 </div>
-                ` : ''}
+                `
+                    : ""
+                }
                 <div class="text-xs text-gray-500 mt-2">
-                    Last update: ${service.last_seen ? new Date(service.last_seen).toLocaleString() : 'Never'}
+                    Last update: ${service.last_seen ? new Date(service.last_seen).toLocaleString() : "Never"}
                 </div>
             </div>
-        `).join('');
+        `,
+        )
+        .join("");
 
-        servicesDiv.innerHTML = `<h4 class="mb-2">Services (${agentData.services.length})</h4>${servicesHtml}`;
-        
-        // Update timestamp
-        document.getElementById('status-update-time').textContent = 
-            `Last update: ${new Date().toLocaleTimeString()}`;
+      servicesDiv.innerHTML = `<h4 class="mb-2">Services (${agentData.services.length})</h4>${servicesHtml}`;
+
+      // Update timestamp
+      document.getElementById("status-update-time").textContent =
+        `Last update: ${new Date().toLocaleTimeString()}`;
     }
 
     // WebSocket Methods
     connectWebSocket() {
-        // Prevent multiple connections
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.log('WebSocket already connected');
-            return;
-        }
+      // Prevent multiple connections
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        console.log("WebSocket already connected");
+        return;
+      }
 
-        // Clear any existing reconnect timeout
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
-        }
+      // Clear any existing reconnect timeout
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
 
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}${this.websocketUrl}`;
-        
-        console.log('Connecting to WebSocket:', wsUrl);
-        this.updateConnectionStatus('Connecting...', false);
-        
-        try {
-            this.ws = new WebSocket(wsUrl);
-            this.setupWebSocketEvents();
-        } catch (error) {
-            console.error('WebSocket connection error:', error);
-            this.updateConnectionStatus('Connection failed', false);
-        }
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}${this.websocketUrl}`;
+
+      console.log("Connecting to WebSocket:", wsUrl);
+      this.updateConnectionStatus("Connecting...", false);
+
+      try {
+        this.ws = new WebSocket(wsUrl);
+        this.setupWebSocketEvents();
+      } catch (error) {
+        console.error("WebSocket connection error:", error);
+        this.updateConnectionStatus("Connection failed", false);
+      }
     }
 
     setupWebSocketEvents() {
-        this.ws.onopen = () => {
-            console.log('WebSocket connected successfully');
-            this.updateConnectionStatus('Connected', true);
-            this.reconnectAttempts = 0; // Reset reconnect counter
-        };
+      this.ws.onopen = () => {
+        console.log("WebSocket connected successfully");
+        this.updateConnectionStatus("Connected", true);
+        this.reconnectAttempts = 0; // Reset reconnect counter
+      };
 
-        this.ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                this.handleWebSocketMessage(data);
-            } catch (error) {
-                console.error('Error parsing WebSocket message:', error);
-            }
-        };
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleWebSocketMessage(data);
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
+        }
+      };
 
-        this.ws.onclose = (event) => {
-            console.log('WebSocket disconnected:', {
-                code: event.code,
-                reason: event.reason,
-                wasClean: event.wasClean
-            });
-            this.updateConnectionStatus('Disconnected', false);
-            
-            // Only attempt to reconnect if the disconnection wasn't intentional
-            if (event.code !== 1000 && this.reconnectAttempts < 5) {
-                this.reconnectAttempts++;
-                const delay = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts)); // Exponential backoff
-                console.log(`Attempting reconnect ${this.reconnectAttempts}/5 in ${delay}ms`);
-                
-                this.reconnectTimeout = setTimeout(() => {
-                    this.connectWebSocket();
-                }, delay);
-            } else {
-                console.log('Not reconnecting - max attempts reached or clean disconnect');
-            }
-        };
+      this.ws.onclose = (event) => {
+        console.log("WebSocket disconnected:", {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        });
+        this.updateConnectionStatus("Disconnected", false);
 
-        this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            this.updateConnectionStatus('Connection error', false);
-            
-            // Don't immediately reconnect on error - let onclose handle it
-        };
+        // Only attempt to reconnect if the disconnection wasn't intentional
+        if (event.code !== 1000 && this.reconnectAttempts < 5) {
+          this.reconnectAttempts++;
+          const delay = Math.min(
+            30000,
+            1000 * Math.pow(2, this.reconnectAttempts),
+          ); // Exponential backoff
+          console.log(
+            `Attempting reconnect ${this.reconnectAttempts}/5 in ${delay}ms`,
+          );
+
+          this.reconnectTimeout = setTimeout(() => {
+            this.connectWebSocket();
+          }, delay);
+        } else {
+          console.log(
+            "Not reconnecting - max attempts reached or clean disconnect",
+          );
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        this.updateConnectionStatus("Connection error", false);
+
+        // Don't immediately reconnect on error - let onclose handle it
+      };
     }
 
     handleWebSocketMessage(data) {
-        if (data.type === 'agent_event') {
-            if (!this.agentEventsPaused) {
-                this.addEventToLog('agent-events', data);
-                this.agentEventCount++;
-                this.updateEventCount('agent', this.agentEventCount);
-            }
-        } else if (data.type === 'client_event') {
-            if (!this.clientEventsPaused) {
-                this.addEventToLog('client-events', data);
-                this.clientEventCount++;
-                this.updateEventCount('client', this.clientEventCount);
-            }
-        } else if (data.type === 'connection_established') {
-            console.log(data.message);
+      if (data.type === "agent_event") {
+        if (!this.agentEventsPaused) {
+          this.addEventToLog("agent-events", data);
+          this.agentEventCount++;
+          this.updateEventCount("agent", this.agentEventCount);
         }
+      } else if (data.type === "client_event") {
+        if (!this.clientEventsPaused) {
+          this.addEventToLog("client-events", data);
+          this.clientEventCount++;
+          this.updateEventCount("client", this.clientEventCount);
+        }
+      } else if (data.type === "connection_established") {
+        console.log(data.message);
+      }
     }
 
     addEventToLog(containerId, eventData) {
-        const container = document.getElementById(containerId);
-        const timestamp = eventData.timestamp ? new Date(eventData.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
-        
-        const eventHtml = `
+      const container = document.getElementById(containerId);
+      const timestamp = eventData.timestamp
+        ? new Date(eventData.timestamp).toLocaleTimeString()
+        : new Date().toLocaleTimeString();
+
+      const eventHtml = `
             <div class="event-entry event-${eventData.source}">
                 <span class="event-time">[${timestamp}]</span>
-                <span class="event-type">${eventData.event_type || 'unknown'}</span>
-                ${eventData.data ? `: ${JSON.stringify(eventData.data, null, 2)}` : ''}
+                <span class="event-type">${eventData.event_type || "unknown"}</span>
+                ${eventData.data ? `: ${JSON.stringify(eventData.data, null, 2)}` : ""}
             </div>
         `;
-        
-        container.innerHTML = eventHtml + container.innerHTML;
-        
-        // Auto-scroll to top (newest at top)
-        container.scrollTop = 0;
-        
-        // Limit to 100 events
-        const events = container.querySelectorAll('.event-entry');
-        if (events.length > 100) {
-            events[events.length - 1].remove();
-        }
+
+      container.innerHTML = eventHtml + container.innerHTML;
+
+      // Auto-scroll to top (newest at top)
+      container.scrollTop = 0;
+
+      // Limit to 100 events
+      const events = container.querySelectorAll(".event-entry");
+      if (events.length > 100) {
+        events[events.length - 1].remove();
+      }
     }
 
     updateConnectionStatus(message, isConnected) {
-        const statusDiv = document.getElementById('connection-status');
-        const reconnectBtn = document.getElementById('manual-reconnect');
-        
-        statusDiv.textContent = message;
-        statusDiv.className = `connection-status ${isConnected ? 'connection-connected' : 'connection-disconnected'}`;
-        
-        // Show/hide manual reconnect button based on connection status
-        if (reconnectBtn) {
-            reconnectBtn.style.display = isConnected ? 'none' : 'inline-flex';
-        }
+      const statusDiv = document.getElementById("connection-status");
+      const reconnectBtn = document.getElementById("manual-reconnect");
+
+      statusDiv.textContent = message;
+      statusDiv.className = `connection-status ${isConnected ? "connection-connected" : "connection-disconnected"}`;
+
+      // Show/hide manual reconnect button based on connection status
+      if (reconnectBtn) {
+        reconnectBtn.style.display = isConnected ? "none" : "inline-flex";
+      }
     }
 
     updateEventCount(type, count) {
-        const countElement = document.getElementById(`${type}-event-count`);
-        countElement.textContent = `${count} event${count !== 1 ? 's' : ''}`;
+      const countElement = document.getElementById(`${type}-event-count`);
+      countElement.textContent = `${count} event${count !== 1 ? "s" : ""}`;
     }
-}
+  }
 
-// Initialize dashboard when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-    new AgentDetailDashboard();
-});
+  // Initialize dashboard when DOM is ready
+  document.addEventListener("DOMContentLoaded", () => {
+    window.agentDetailDashboard = new AgentDetailDashboard();
+  });
 </script>
 {% endblock %}
