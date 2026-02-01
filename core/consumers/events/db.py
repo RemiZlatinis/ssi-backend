@@ -21,10 +21,8 @@ def get_agent(key: uuid.UUID) -> Agent | None:
     Returns the agent with the given key if it exists and is registered, otherwise None.
     """
     try:
-        return (
-            Agent.objects.prefetch_related("services")
-            .select_related("owner")
-            .get(key=key, registration_status=Agent.RegistrationStatus.REGISTERED)
+        return Agent.objects.select_related("owner").get(
+            key=key, registration_status=Agent.RegistrationStatus.REGISTERED
         )
     except Agent.DoesNotExist:
         logger.warning(f"Connection attempt with invalid agent key: {key}")

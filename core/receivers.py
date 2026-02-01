@@ -73,9 +73,9 @@ async def post_save_agent(
     Handles Agent updates and broadcast the changes to all connected clients.
     """
     # Prepare event payload
-    agent_model = map_agent_to_client_model(instance)
+    agent_mapped_model = await sync_to_async(map_agent_to_client_model)(instance)
     client_event = ClientStatusUpdateEvent(
-        data=ClientStatusUpdatePayload(agent=agent_model)
+        data=ClientStatusUpdatePayload(agent=agent_mapped_model)
     )
 
     # Broadcast the event
