@@ -1,10 +1,10 @@
 import json
 import logging
 import uuid
-from typing import Any
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
+from django.db.utils import DatabaseError
 
 from core.consumers.events import (
     agent_event_type_adapter,
@@ -12,7 +12,6 @@ from core.consumers.events import (
     handle_agent_event,
     update_agent_ip,
 )
-from core.consumers.groups import get_agent_group_name
 from core.models import Agent
 from core.utils import get_client_ip
 
@@ -25,7 +24,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
     """
 
     agent: Agent | None = None
-    private_group: str | None = None
 
     async def connect(self) -> None:
         # Get the agent key from the URL
@@ -52,10 +50,6 @@ class AgentConsumer(AsyncWebsocketConsumer):
         # Accept the connection (We are now receiving messages from the agent)
         await self.accept()
 
-        # Join the agent's private group
-        self.private_group = get_agent_group_name(self.agent.key)
-        await self.channel_layer.group_add(self.private_group, self.channel_name)
-
         # Update the agent's IP
         await update_agent_ip(agent=self.agent, new_ip=get_client_ip(self.scope))
 
@@ -78,16 +72,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
             logger.error(f"Error in AgentConsumer.receive: {e}", exc_info=True)
 
     async def disconnect(self, code: int) -> None:
-        # Leave the agent's private group
-        if self.private_group:
-            await self.channel_layer.group_discard(
-                self.private_group, self.channel_name
-            )
-
         if self.agent:
-            # I will remember that.
-            await database_sync_to_async(self.agent.mark_disconnected)()
-
-    async def force_disconnect(self, event: dict[str, Any]) -> None:
-        """Handler for 'force.disconnect' event sent via Channel Layer."""
-        await self.close(code=4001)
+            try:
+                await database_sync_to_async(self.agent.mark_disconnected)()
+            except DatabaseError:
+                pass  # Agent was deleted while connected, ignore
