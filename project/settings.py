@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import dj_database_url
 import sentry_sdk
+from django.utils.csp import CSP
 from dotenv import load_dotenv
 
 ################################################################################
@@ -105,6 +106,7 @@ if DEBUG:
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "servestatic.middleware.ServeStaticMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -118,6 +120,28 @@ MIDDLEWARE = [
 
 WSGI_APPLICATION = "project.wsgi.application"
 ASGI_APPLICATION = "project.asgi.application"
+
+# Content Security Policy settings (report-only mode)
+SECURE_CSP_REPORT_ONLY = {
+    "default-src": [CSP.SELF],
+    "script-src": [
+        CSP.SELF,
+        "'unsafe-inline'",  # Required for Django Admin
+    ],
+    "style-src": [
+        CSP.SELF,
+        "'unsafe-inline'",  # Required for Django Admin
+    ],
+    "img-src": [CSP.SELF, "data:", "https:", "*"],
+    "font-src": [CSP.SELF, "https:"],
+    "connect-src": [CSP.SELF],
+    "media-src": [CSP.SELF],
+    "object-src": [CSP.NONE],
+    "frame-src": [CSP.NONE],
+    "frame-ancestors": [CSP.NONE],
+    "base-uri": [CSP.SELF],
+    "form-action": [CSP.SELF],
+}
 
 # Database configuration using DATABASE_URL (fallbacks to components)
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -210,6 +234,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.csp",
             ],
         },
     },
