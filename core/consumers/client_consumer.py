@@ -90,6 +90,10 @@ class ClientConsumer(AsyncHttpConsumer):
                     # Send heartbeat comment to keep connection alive
                     await self.send_body(b":heartbeat\n\n", more_body=True)
 
+        except asyncio.CancelledError:
+            logger.debug(
+                f"SSE [{self.channel_name}] Connection closed (client disconnected)"
+            )
         except Exception as e:
             logger.debug(f"SSE [{self.channel_name}] Connection closed: {e}")
         finally:
