@@ -24,7 +24,7 @@ class DeviceViewSet(viewsets.ModelViewSet):
     queryset = Device.objects.all()
     permission_classes = [IsAuthenticated, IsDeviceOwner]
 
-    @decorators.action(detail=True, methods=["get"], url_path="test")
+    @decorators.action(detail=True, methods=["post"], url_path="test")
     def send_test_notification(self, request: Request, pk: str) -> Response:
         """Sends a test notification to the requested device"""
         device = self.get_object()  # This applies permissions
