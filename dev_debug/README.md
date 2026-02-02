@@ -18,7 +18,7 @@ A development-only debugging interface for the SSI (Service Status Indicator) ba
    - Auto-scrolling with event history
    - Color-coded event types
 
-3. **Client Events Log** (WebSocket)  
+3. **Client Events Log** (WebSocket)
    - Live events broadcast to clients
    - Real-time notification monitoring
    - Session-based event storage
@@ -262,7 +262,7 @@ The debug dashboard shows:
 
 ## 🚨 Production Note
 
-**This dashboard is development-only and will not be available in production environments.** 
+**This dashboard is development-only and will not be available in production environments.**
 
 All debug URLs and WebSocket endpoints are automatically disabled when `DEBUG=False`.
 

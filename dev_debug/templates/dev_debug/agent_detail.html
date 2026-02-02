@@ -831,7 +831,7 @@ Debug Dashboard{% endblock %} {% block extra_css %}
                         <strong>${service.name}</strong>
                         <div class="text-sm text-gray-500">${service.description || "No description"}</div>
                         <div class="text-xs text-gray-500 mt-1">
-                            ID: ${service.agent_service_id} 
+                            ID: ${service.agent_service_id}
                             ${service.version ? `| Version: ${service.version}` : ""}
                             ${service.schedule ? `| Schedule: ${service.schedule}` : ""}
                         </div>

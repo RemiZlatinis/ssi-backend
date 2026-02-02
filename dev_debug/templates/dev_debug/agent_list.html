@@ -11,7 +11,7 @@
             <span class="status-indicator status-offline ml-2">{{ total_agents|add:"-"|add:online_agents }} Offline</span>
         </div>
     </div>
-    
+
     <div class="grid grid-3 mb-4">
         <div class="text-center">
             <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">{{ total_agents }}</div>
@@ -37,7 +37,7 @@
         </div>
     </div>
     <div class="text-sm text-gray-500 mt-2">
-        Last update: <span id="last-update">Never</span> | 
+        Last update: <span id="last-update">Never</span> |
         Updates per second: 1
     </div>
 </div>
@@ -60,7 +60,7 @@
                         {% endif %}
                     </h3>
                     <div class="text-sm text-gray-500">
-                        Owner: {{ agent.owner.username }} | 
+                        Owner: {{ agent.owner.username }} |
                         IP: {{ agent.ip_address|default:"Unknown" }} |
                         Services: {{ agent.services.count }}
                     </div>
@@ -70,7 +70,7 @@
                     </div>
                 </div>
                 <div>
-                    <span class="status-indicator 
+                    <span class="status-indicator
                         {% if agent.registration_status == 'registered' %}status-online
                         {% elif agent.registration_status == 'pending' %}status-pending
                         {% else %}status-offline{% endif %}">
@@ -122,10 +122,10 @@ class AgentListDashboard {
         pollBtn.classList.remove('btn-primary');
         pollBtn.classList.add('btn-secondary');
         document.getElementById('update-status').textContent = 'Updating...';
-        
+
         // Fetch immediately
         this.fetchAgentData();
-        
+
         this.updateInterval = setInterval(() => {
             this.fetchAgentData();
         }, 1000); // 1 second polling
@@ -138,7 +138,7 @@ class AgentListDashboard {
         pollBtn.classList.remove('btn-secondary');
         pollBtn.classList.add('btn-primary');
         document.getElementById('update-status').textContent = 'Paused';
-        
+
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
@@ -151,7 +151,7 @@ class AgentListDashboard {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-            
+
             const data = await response.json();
             this.updateAgentList(data.agents);
             this.updateLastUpdateTime();
@@ -163,7 +163,7 @@ class AgentListDashboard {
 
     updateAgentList(agents) {
         const agentList = document.getElementById('agent-list');
-        
+
         if (agents.length === 0) {
             agentList.innerHTML = `
                 <div class="text-center text-gray-500 py-8">
@@ -183,13 +183,13 @@ class AgentListDashboard {
                             <a href="/dev-debug/agent/${agent.id}/" class="btn btn-primary">
                                 ${agent.name}
                             </a>
-                            ${agent.is_online 
-                                ? '<span class="status-indicator status-online">Online</span>' 
+                            ${agent.is_online
+                                ? '<span class="status-indicator status-online">Online</span>'
                                 : '<span class="status-indicator status-offline">Offline</span>'
                             }
                         </h3>
                         <div class="text-sm text-gray-500">
-                            Owner: ${agent.owner} | 
+                            Owner: ${agent.owner} |
                             IP: ${agent.ip_address || 'Unknown'} |
                             Services: ${agent.services.length}
                         </div>
