@@ -25,10 +25,8 @@ class AgentAuthentication(BaseAuthentication):
 
         try:
             agent_key = auth_header.split(" ")[1]
-            agent = Agent.objects.select_related("owner").get(
-                key=agent_key, registration_status=Agent.RegistrationStatus.REGISTERED
-            )
+            agent = Agent.objects.select_related("owner").get(key=agent_key)
         except (IndexError, Agent.DoesNotExist):
-            raise AuthenticationFailed("Invalid or not registered agent key.")
+            raise AuthenticationFailed("Invalid agent key.")
 
         return (agent.owner, agent)

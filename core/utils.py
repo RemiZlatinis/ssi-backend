@@ -1,41 +1,29 @@
 from typing import Any, cast
 
-from django.http import HttpRequest
 
-
-def get_client_ip(
-    scope_or_request: HttpRequest | Any,
-) -> str | None:
+def get_client_ip(scope: dict[str, Any]) -> str | None:
     """
-    Get the client's real IP address from a request or a WebSocket scope.
+    Get the client's real IP address from a WebSocket scope.
 
     This function correctly handles the 'X-Forwarded-For' header, which is
     essential when the application is running behind a reverse proxy, load
     balancer, or other gateway.
 
     Args:
-        scope_or_request: A Django request object or a Channels scope dictionary.
+        scope: A Channels scope dictionary from WebSocket connection.
 
     Returns:
         The client's IP address as a string, or None if it cannot be determined.
     """
-    # Check if it's a Django request object
-    if isinstance(scope_or_request, HttpRequest):
-        x_forwarded_for = scope_or_request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            return cast(str, x_forwarded_for).split(",")[0].strip()
-        return scope_or_request.META.get("REMOTE_ADDR")
-
-    # Otherwise, treat it as a Channels scope (dict-like)
-    if "headers" in scope_or_request:
-        headers_list = scope_or_request.get("headers", [])
+    headers_list = scope.get("headers", [])
+    if headers_list:
         headers = dict(cast(list[tuple[bytes, bytes]], headers_list))
         x_forwarded_for = headers.get(b"x-forwarded-for")
         if x_forwarded_for:
             return x_forwarded_for.decode("utf-8").split(",")[0].strip()
 
     # Fallback to client info if available
-    client_info = scope_or_request.get("client", (None, None))
+    client_info = scope.get("client", (None, None))
     ip_tuple = cast(tuple[str | None, int | None], client_info)
     return ip_tuple[0]
 
