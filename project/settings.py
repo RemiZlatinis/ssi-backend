@@ -252,6 +252,12 @@ STORAGES = {
     },
 }
 
+TASKS = {
+    "default": {
+        "BACKEND": "django.tasks.backends.immediate.ImmediateBackend",
+    },
+}
+
 SITE_ID = 1  # The one and only site on DB. This is required for the django-allauth
 
 # django-allauth settings
