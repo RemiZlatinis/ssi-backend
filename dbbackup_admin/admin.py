@@ -40,19 +40,18 @@ class BackupAdmin(admin.ModelAdmin):
     )
     actions = ["restore_selected_backup"]
 
+    @admin.display(description="File Status")
     def file_status(self, obj):
         """Display whether the backup file exists."""
         if obj.file_exists:
             return format_html('<span style="color: #56914a;">✓ File exists</span>')
         return format_html('<span style="color: #b33b46;">✗ File missing</span>')
 
-    file_status.short_description = "File Status"
-
+    @admin.display(description="Size")
     def size_display(self, obj):
         return obj.get_size_display()
 
-    size_display.short_description = "Size"
-
+    @admin.display(description="Actions")
     def admin_actions(self, obj):
         """Display action buttons for each backup."""
         actions = []
@@ -87,8 +86,6 @@ class BackupAdmin(admin.ModelAdmin):
                 )
 
         return mark_safe("".join(actions)) if actions else "-"
-
-    admin_actions.short_description = "Actions"
 
     def get_urls(self):
         """Add custom URLs for backup operations."""

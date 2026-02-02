@@ -8,7 +8,8 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "django (>=5.2.6,<6.0.0)",
+    "django (>=6.0.0,<7.0.0)",
+    "asgiref (>=3.9.1)",
     "djangorestframework (>=3.16.1,<4.0.0)",
     "channels[daphne] (>=4.3.1,<5.0.0)",
     "django-allauth[socialaccount] (>=65.11.2,<66.0.0)",
