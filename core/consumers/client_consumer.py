@@ -5,7 +5,6 @@ import uuid
 from channels.generic.http import AsyncHttpConsumer
 from pydantic import ValidationError
 
-from authentication.decorators import sse_require_auth
 from core.consumers.events import client_event_type_adapter, get_user_agents
 from core.consumers.events.typing import (
     ClientInitialStatusEvent,
@@ -27,10 +26,18 @@ class ClientConsumer(AsyncHttpConsumer):
 
     user_clients_group_name = None
 
-    @sse_require_auth
     async def handle(self, body):
-        # The `@sse_require_auth` sets a valid user or returns HTTP 401 immediately
-        user = self.scope["user"]  # type:ignore
+        user = self.scope["user"]
+
+        if not user.is_authenticated:
+            await self.send_response(
+                401,
+                b"Authentication required",
+                headers=[
+                    (b"Content-Type", b"application/json"),
+                ],
+            )
+            return
 
         # Setup SSE Headers
         await self.send_headers(
