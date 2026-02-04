@@ -273,10 +273,12 @@ HEADLESS_ONLY = True
 HEADLESS_CLIENTS = ["app", "browser"]  # We support both mobile and browser auth flows
 HEADLESS_ADAPTER = "authentication.adapters.CustomHeadlessAdapter"
 
-# DRF settings - using allauth's X-Session-Token authentication
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        # X-Session-Tokens for mobile
         "allauth.headless.contrib.rest_framework.authentication.XSessionTokenAuthentication",
+        # SessionAuthentication for web clients (cookie-based)
+        "rest_framework.authentication.SessionAuthentication",
     ),
 }
 
