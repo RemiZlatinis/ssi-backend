@@ -9,10 +9,13 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 
 import os
 
+from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
 from django.urls import re_path
 from servestatic import ServeStaticASGI
+
+from authentication.middleware import XSessionTokenMiddleware
 
 from .settings import DEBUG, STATIC_ROOT
 
@@ -43,11 +46,15 @@ else:
 
 application = ProtocolTypeRouter(
     {
-        "http": URLRouter(
-            [
-                *core.routing.http_urlpatterns,
-                re_path(r"", django_asgi_app),
-            ]
+        "http": AuthMiddlewareStack(
+            XSessionTokenMiddleware(
+                URLRouter(
+                    [
+                        *core.routing.http_urlpatterns,
+                        re_path(r"", django_asgi_app),
+                    ]
+                )
+            )
         ),
         "websocket": websocket_app,
     }
