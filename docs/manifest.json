@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "title": "SSI Backend Documentation",
+  "sections": [
+    {
+      "id": "deployment",
+      "title": "Deployment",
+      "order": 0,
+      "pages": [
+        {
+          "id": "self-hosting",
+          "title": "Self-Hosting Guide",
+          "file": "self-hosting.md",
+          "order": 0
+        }
+      ]
+    }
+  ]
+}
