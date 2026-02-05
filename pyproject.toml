@@ -1,6 +1,6 @@
 [project]
 name = "ssi-backend"
-version = "0.1.0"
+version = "1.0.0-alpha.1"
 description = "The Backend of the Service Status Indicator monitoring system"
 authors = [
     {name = "Remi Zlatinis", email = "remizlatinis@gmail.com"}
