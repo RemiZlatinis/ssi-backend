@@ -3,7 +3,7 @@ name = "ssi-backend"
 version = "0.1.0"
 description = "The Backend of the Service Status Indicator monitoring system"
 authors = [
-    {name = "RemiZlatinis",email = "remizlatinis@gmail.com"}
+    {name = "Remi Zlatinis", email = "remizlatinis@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.12"
