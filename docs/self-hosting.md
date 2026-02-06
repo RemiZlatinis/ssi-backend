@@ -1,4 +1,4 @@
-# Self-Hosting SSI Backend
+# Self-Hosting Guide
 
 This guide provides step-by-step instructions for hosting your own instance of the SSI Backend.
 
