@@ -1,4 +1,3 @@
-from allauth.headless.internal.sessionkit import authenticate_by_x_session_token
 from asgiref.sync import sync_to_async
 
 
@@ -33,6 +32,11 @@ class XSessionTokenMiddleware:
 
         if session_token:
             try:
+                # Lazy import to avoid App Registry access during ASGI initialization
+                from allauth.headless.internal.sessionkit import (
+                    authenticate_by_x_session_token,
+                )
+
                 # Authenticate using allauth's internal sessionkit
                 # sync_to_async is needed as it performs database operations
                 auth_result = await sync_to_async(authenticate_by_x_session_token)(
