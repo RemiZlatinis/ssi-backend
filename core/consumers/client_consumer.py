@@ -3,6 +3,7 @@ import logging
 import uuid
 
 from channels.generic.http import AsyncHttpConsumer
+from django.conf import settings
 from pydantic import ValidationError
 
 from core.consumers.events import client_event_type_adapter, get_user_agents
@@ -39,6 +40,15 @@ class ClientConsumer(AsyncHttpConsumer):
             )
             return
 
+        # CORS Handling
+        cors_headers = []
+        for key, value in self.scope["headers"]:
+            if key == b"origin" and value.decode() in settings.CORS_ALLOWED_ORIGINS:
+                # Add the validated origin header and credentials header to the response
+                cors_headers.append((b"Access-Control-Allow-Origin", value))
+                cors_headers.append((b"Access-Control-Allow-Credentials", b"true"))
+                break
+
         # Setup SSE Headers
         await self.send_headers(
             headers=[
@@ -46,7 +56,7 @@ class ClientConsumer(AsyncHttpConsumer):
                 (b"Cache-Control", b"no-cache"),
                 (b"Transfer-Encoding", b"chunked"),
                 (b"Connection", b"keep-alive"),
-                (b"Access-Control-Allow-Origin", b"*"),
+                *cors_headers,
             ]
         )
 
