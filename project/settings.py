@@ -65,10 +65,6 @@ CORS_ALLOW_CREDENTIALS = True
 SESSION_COOKIE_SECURE = True if ENVIRONMENT == "production" else False
 CSRF_COOKIE_SECURE = True if ENVIRONMENT == "production" else False
 
-# The next two must be removed when we move to app.domain.com
-SESSION_COOKIE_SAMESITE = "None" if ENVIRONMENT == "production" else "Lax"
-CSRF_COOKIE_SAMESITE = "None" if ENVIRONMENT == "production" else "Lax"
-
 
 INSTALLED_APPS = [
     # Priority apps
