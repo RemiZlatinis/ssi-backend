@@ -65,6 +65,8 @@ CORS_ALLOW_CREDENTIALS = True
 SESSION_COOKIE_SECURE = True if ENVIRONMENT == "production" else False
 CSRF_COOKIE_SECURE = True if ENVIRONMENT == "production" else False
 
+# Trust the X-Forwarded-Proto header from the proxy (Render.com, Nginx, etc.)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 INSTALLED_APPS = [
     # Priority apps
@@ -271,6 +273,9 @@ SOCIALACCOUNT_AUTO_SIGNUP = (
     True  # Automatically sign up users on successful social login
 )
 SOCIALACCOUNT_EMAIL_AUTHENTICATION = True  # Auto-link social accounts with emails
+
+# Ensure allauth generates HTTPS links in production
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https" if ENVIRONMENT == "production" else "http"
 
 # Headless configuration (API-only mode for Expo SDK clients - mobile and web)
 HEADLESS_ONLY = True
