@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import uuid
 
 from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
@@ -11,21 +10,16 @@ from core.consumers.events.typing import (
     ClientInitialStatusEvent,
     ClientInitialStatusPayload,
 )
-from core.consumers.groups import get_client_group_name
+from core.consumers.groups import get_client_group_name, get_user_sse_channel_name
 
 logger = logging.getLogger(__name__)
 
 
 class ClientConsumer(AsyncHttpConsumer):
-    """
-    Consumes an HTTP-Stream connection from a client. (Server-Sent Events)
-
-    Unlike WebsocketConsumer, AsyncHttpConsumer does NOT automatically dispatch
-    channel layer messages to handler methods. We must actively listen for them
-    using channel_layer.receive() within the handle() method.
-    """
+    """Server-Sent Events consumer for streaming agent updates to clients."""
 
     user_clients_group_name = None
+    _disconnecting = False
 
     async def handle(self, body):
         user = self.scope["user"]
@@ -34,13 +28,11 @@ class ClientConsumer(AsyncHttpConsumer):
             await self.send_response(
                 401,
                 b"Authentication required",
-                headers=[
-                    (b"Content-Type", b"application/json"),
-                ],
+                headers=[(b"Content-Type", b"application/json")],
             )
             return
 
-        # CORS Handling
+        # CORS headers
         cors_headers = []
         for key, value in self.scope["headers"]:
             if key == b"origin" and value.decode() in settings.CORS_ALLOWED_ORIGINS:
@@ -49,7 +41,7 @@ class ClientConsumer(AsyncHttpConsumer):
                 cors_headers.append((b"Access-Control-Allow-Credentials", b"true"))
                 break
 
-        # Setup SSE Headers
+        # Send SSE headers
         await self.send_headers(
             headers=[
                 (b"Content-Type", b"text/event-stream"),
@@ -60,101 +52,95 @@ class ClientConsumer(AsyncHttpConsumer):
             ]
         )
 
-        # Join User Group
+        # Setup channel and group
         self.user_clients_group_name = get_client_group_name(user.pk)
+        self.channel_name = get_user_sse_channel_name(user.pk)
 
-        # IMPORTANT: AsyncHttpConsumer doesn't always have a channel_name assigned
-        # by the protocol server (Daphne). If it's missing, we generate one
-        # to allow us to participate in the channel layer group.
-        if not self.channel_name:
-            self.channel_name = f"sse_{uuid.uuid4().hex}"
+        logger.debug(f"SSE [{self.channel_name}] Connected")
 
-        logger.debug(
-            f"SSE [{self.channel_name}] Joining group: {self.user_clients_group_name}"
-        )
-        await self.channel_layer.group_add(
-            self.user_clients_group_name, self.channel_name
-        )
-
-        # Send Initial Status
-        initial_agents = await get_user_agents(user)
-        payload = ClientInitialStatusPayload(agents=initial_agents)
-        event = ClientInitialStatusEvent(data=payload)
-        await self._send_server_event(event)
-
-        # Main loop: Listen for channel layer messages and dispatch them.
         try:
-            while True:
+            await self.channel_layer.group_add(
+                self.user_clients_group_name, self.channel_name
+            )
+        except Exception as e:
+            logger.error(f"SSE [{self.channel_name}] Failed to join group: {e}")
+            return
+
+        # Send initial status
+        initial_agents = await get_user_agents(user)
+        event = ClientInitialStatusEvent(
+            data=ClientInitialStatusPayload(agents=initial_agents)
+        )
+        await self._send_event(event)
+
+        # Listen for events
+        try:
+            while not self._disconnecting:
                 try:
                     # Wait for a channel layer message with a timeout for heartbeats
                     message = await asyncio.wait_for(
                         self.channel_layer.receive(self.channel_name),
                         timeout=30,
                     )
-
-                    # Dispatch to appropriate handler based on message type
-                    # Message type uses dots (e.g., "status_update"), convert to method
-                    handler_name = message["type"].replace(".", "_")
-                    handler = getattr(self, handler_name, None)
-                    if handler:
-                        await handler(message)
-                    else:
-                        logger.warning(
-                            f"SSE [{self.channel_name}] No handler for: {handler_name}"
-                        )
+                    await self._handle_message(message)
 
                 except asyncio.TimeoutError:
-                    # Send heartbeat comment to keep connection alive
-                    await self.send_body(b":heartbeat\n\n", more_body=True)
+                    if not self._disconnecting:
+                        # Send heartbeat comment to keep connection alive
+                        await self.send_body(b":heartbeat\n\n", more_body=True)
 
         except asyncio.CancelledError:
-            logger.debug(
-                f"SSE [{self.channel_name}] Connection closed (client disconnected)"
-            )
-        except Exception as e:
-            logger.debug(f"SSE [{self.channel_name}] Connection closed: {e}")
+            logger.debug(f"SSE [{self.channel_name}] Disconnected")
+            self._disconnecting = True
+            raise
         finally:
-            # Cleanup: Leave the group
-            if self.user_clients_group_name:
+            await self._cleanup()
+
+    async def _handle_message(self, message: dict) -> None:
+        """Dispatch message to appropriate handler based on type."""
+        handler_name = message["type"].replace(".", "_")
+        handler = getattr(self, handler_name, None)
+
+        if handler:
+            await handler(message)
+        else:
+            logger.warning(
+                f"SSE [{self.channel_name}] Unknown message type: {handler_name}"
+            )
+
+    async def _handle_event(self, message: dict) -> None:
+        """Generic handler for all event types."""
+        if self._disconnecting:
+            return
+        await self._send_event(message["event"])
+
+    # Message handlers - all delegate to _handle_event
+    status_update = _handle_event
+    service_added = _handle_event
+    service_removed = _handle_event
+    service_status_update = _handle_event
+
+    async def _send_event(self, event) -> None:
+        """Send an event to the client."""
+        if self._disconnecting:
+            return
+
+        try:
+            validated_event = client_event_type_adapter.validate_python(event)
+            body = f"data: {validated_event.model_dump_json()}\n\n"
+            await self.send_body(body.encode("utf-8"), more_body=True)
+        except ValidationError as e:
+            logger.error(f"SSE [{self.channel_name}] Validation error: {e}")
+        except Exception as e:
+            logger.error(f"SSE [{self.channel_name}] Send error: {e}")
+
+    async def _cleanup(self) -> None:
+        """Leave the group on disconnect."""
+        if self.user_clients_group_name and self.channel_name:
+            try:
                 await self.channel_layer.group_discard(
                     self.user_clients_group_name, self.channel_name
                 )
-            logger.debug(f"SSE [{self.channel_name}] Cleanup complete")
-
-    # --- Channel Layer Message Handlers ---
-
-    async def status_update(self, message: dict) -> None:
-        logger.debug(f"SSE [{self.channel_name}] Processing status_update")
-        await self._send_server_event(message["event"])
-
-    async def service_added(self, message: dict) -> None:
-        logger.debug(f"SSE [{self.channel_name}] Processing service_added")
-        await self._send_server_event(message["event"])
-
-    async def service_removed(self, message: dict) -> None:
-        logger.debug(f"SSE [{self.channel_name}] Processing service_removed")
-        await self._send_server_event(message["event"])
-
-    async def service_status_update(self, message: dict) -> None:
-        logger.debug(f"SSE [{self.channel_name}] Processing service_status_update")
-        await self._send_server_event(message["event"])
-
-    # --- Helper Methods ---
-
-    async def _send_server_event(self, event) -> None:
-        """
-        Validates, serializes, and sends a Pydantic Event as a Server-Sent Event.
-        """
-        try:
-            validated_event = client_event_type_adapter.validate_python(event)
-            serialized_event = validated_event.model_dump_json()
-            body = f"data: {serialized_event}\n\n"
-
-            logger.debug(
-                f"SSE [{self.channel_name}] Sending event: {validated_event.type}"
-            )
-            await self.send_body(body.encode("utf-8"), more_body=True)
-        except ValidationError as e:
-            logger.error(f"SSE [{self.channel_name}] Validation Error: {e}")
-        except Exception as e:
-            logger.error(f"SSE [{self.channel_name}] Send Error: {e}")
+                logger.debug(f"SSE [{self.channel_name}] Disconnected and cleaned up")
+            except Exception:
+                pass  # Best-effort cleanup

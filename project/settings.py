@@ -296,7 +296,17 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [os.getenv("REDIS_URL", "redis://valkey:6379/0")],
+            "hosts": [
+                {
+                    "address": os.getenv("REDIS_URL", "redis://valkey:6379/0"),
+                    "retry_on_timeout": True,
+                    "health_check_interval": 30,
+                    "socket_keepalive": True,
+                }
+            ],
+            "capacity": 1500,
+            "expiry": 60,
+            "group_expiry": 3600,
         },
     },
 }
@@ -426,6 +436,16 @@ LOGGING = {
         "dbbackup_admin": {
             "handlers": ["console", "file"],
             "level": os.getenv("LOG_LEVEL_DBBACKUP_ADMIN", LOG_LEVEL).upper(),
+            "propagate": False,
+        },
+        "channels": {
+            "handlers": ["console", "file"],
+            "level": os.getenv("LOG_LEVEL_CHANNELS", "INFO"),
+            "propagate": False,
+        },
+        "channels_redis": {
+            "handlers": ["console", "file"],
+            "level": os.getenv("LOG_LEVEL_CHANNELS_REDIS", "INFO"),
             "propagate": False,
         },
     },
