@@ -16,12 +16,18 @@ def get_client_group_name(user_id: str | int) -> str:
 
 def get_user_sse_channel_name(user_id: str | int) -> str:
     """
-    Returns the deterministic channel name for a user's SSE connections.
+    Returns the base channel name for a user's SSE connections.
 
-    All SSE connections from the same user share this channel name,
-    which prevents race conditions in channels_redis when multiple
-    connections exist simultaneously.
+    This provides a deterministic prefix for all connections from a user.
+    Each connection should append a unique suffix (e.g., UUID) to create
+    the final channel name: f"{base_channel}_{unique_suffix}"
+
+    This hybrid approach ensures:
+    - All clients receive messages (unique channels per connection)
+    - Debuggable channel names (user ID in prefix)
+    - No race conditions in channels_redis
 
     Format: "sse_user_{user_id}"
+    Example final channel: "sse_user_2_a1b2c3d4"
     """
     return f"sse_user_{user_id}"

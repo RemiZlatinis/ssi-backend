@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 
 from channels.generic.http import AsyncHttpConsumer
 from django.conf import settings
@@ -53,8 +54,11 @@ class ClientConsumer(AsyncHttpConsumer):
         )
 
         # Setup channel and group
+        # Use hybrid naming: deterministic prefix + unique suffix per connection
+        # This ensures all clients receive messages while keeping channels debuggable
         self.user_clients_group_name = get_client_group_name(user.pk)
-        self.channel_name = get_user_sse_channel_name(user.pk)
+        base_channel = get_user_sse_channel_name(user.pk)
+        self.channel_name = f"{base_channel}_{uuid.uuid4().hex[:8]}"
 
         logger.debug(f"SSE [{self.channel_name}] Connected")
 
@@ -136,11 +140,9 @@ class ClientConsumer(AsyncHttpConsumer):
 
     async def _cleanup(self) -> None:
         """Leave the group on disconnect."""
-        if self.user_clients_group_name and self.channel_name:
-            try:
-                await self.channel_layer.group_discard(
-                    self.user_clients_group_name, self.channel_name
-                )
-                logger.debug(f"SSE [{self.channel_name}] Disconnected and cleaned up")
-            except Exception:
-                pass  # Best-effort cleanup
+        try:
+            await self.channel_layer.group_discard(
+                self.user_clients_group_name, self.channel_name
+            )
+        except Exception:
+            pass
