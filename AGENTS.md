@@ -180,13 +180,134 @@ When working on this repository, AI agents **must**:
 ```
 type(scope): short description
 
-Optional extended body:
-- Explain why, not just what
-- Reference related issues if applicable
+Body paragraphs describing the problem and solution
+
+Key changes (only when needed for clarity):
+- Specific change 1
+- Specific change 2
 ```
 
 **Types**: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `security`, `build`, `ci`, `style` etc.
 **Scopes**: App names (`core`, `authentication`, `notifications`) or `api`, `models`, `admin` etc.
+
+### Writing Effective Commit Messages
+
+A good commit message tells the story of **what the user experiences** and **how we fixed it**, not just what code changed.
+
+**The One-Line Summary:**
+- Describe the user-visible impact or symptom, NOT the root technical cause
+- Think: "What would a user report as a bug?" not "What was wrong in the code?"
+- Use active voice: "prevent", "fix", "add", "remove" — not "fixes", "adds"
+
+**The Body:**
+1. **Problem paragraph**: Describe what users experience. Be specific about symptoms and impact.
+2. **Solution paragraph**: Explain how the fix addresses the problem. Focus on behavior changes, not implementation details.
+3. **Key changes** (optional): Only include for complex changes where the code modifications aren't obvious from the description. List specific files/methods modified when the "what" and "how" aren't enough.
+
+### Examples
+
+#### Good Example — Fix Type
+
+```
+fix(core): unnecessary notifications about agent online status
+
+User receives spam notifications every hour when agents briefly disconnect
+and reconnect, making it hard to notice genuine outages.
+
+We are introducing a 5-second grace period before marking an agent as
+disconnected. If the agent reconnects within this window, no notifications
+are sent. Only sustained WebSocket disconnections trigger agent disconnection.
+
+Key changes:
+- AgentConsumer.disconnect: Sets last_seen, waits 5s, refreshes from DB,
+  and marks agent disconnected after verifying disconnection was sustained
+- Agent.mark_disconnected: Now only updates is_online and sends signal
+  (last_seen is set in disconnect handler before grace period)
+```
+
+#### Bad Example — Same Fix
+
+```
+fix(core): fix notification bug
+
+The mark_disconnected method was causing too many notifications. Added a
+sleep and check before sending notifications. Also updated the model to
+not set last_seen anymore.
+
+Changes:
+- Updated disconnect method
+- Modified mark_disconnected
+- Added refresh_from_db call
+```
+
+**Why it's bad**:
+- Summary describes nothing about user impact ("fix notification bug" is generic)
+- Body focuses on code changes, not user problem
+- "Added a sleep" describes implementation, not behavior
+- No explanation of WHY the notifications were problematic
+
+#### Good Example — Feature Type
+
+```
+feat(api): agents can update service configuration without reconnecting
+
+Previously, agents had to disconnect and reconnect to the WebSocket to
+propagate service configuration changes (name, description, schedule) to
+the backend. This caused unnecessary connection churn and status flapping.
+
+We now support a new agent.service_updated event that allows agents to
+push configuration changes in real-time without disrupting the connection.
+The backend validates and applies updates immediately while maintaining
+existing service state.
+
+Key changes:
+- Add AgentServiceUpdatedEvent type and handler
+- Update Service model to support partial updates
+- Broadcast service changes to connected clients via SSE
+```
+
+#### Bad Example — Same Feature
+
+```
+feat(api): add service update endpoint
+
+Added new event type for service updates. Agents can now send updates
+without reconnecting. Also added handler and updated the service model.
+
+- Added AgentServiceUpdatedEvent
+- Added handle_service_updated function
+- Modified Service.save method
+```
+
+**Why it's bad**:
+- Summary mentions "endpoint" (incorrect terminology for WebSocket events)
+- Body just lists what was added, not why it matters
+- No mention of the problem (connection churn)
+- No mention of the benefit (no disruption)
+
+#### When to Skip "Key Changes"
+
+For simple, obvious fixes, omit the Key Changes section:
+
+```
+fix(auth): login fails with case-sensitive email addresses
+
+Users could not log in if they typed their email with different casing
+than when they registered (e.g., "User@Example.com" vs "user@example.com").
+
+Email addresses are now normalized to lowercase during both registration
+and login, ensuring consistent matching regardless of input casing.
+```
+
+**No Key Changes needed** — the fix is obvious from the description (normalize email casing).
+
+### Quick Checklist
+
+- [ ] Does the one-line summary describe what users experience?
+- [ ] Does the body explain WHY this change was needed (problem)?
+- [ ] Does the body explain WHAT behavior changed (solution)?
+- [ ] Are technical implementation details in "Key Changes" only when necessary?
+- [ ] Would someone reading this commit in 6 months understand the context?
 
 ---
 
