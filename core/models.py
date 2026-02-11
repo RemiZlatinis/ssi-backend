@@ -63,13 +63,12 @@ class Agent(models.Model):
 
     def mark_disconnected(self) -> None:
         """
-        Sets the agent.is_online to False,
-        the agent.last_seen to timezone.now(),
-        and trigger the agent_status_changed signal
+        Sets the agent.is_online to False and trigger the agent_status_changed signal
+
+        Note: The agent.last_seen is set in the AgentConsumer.disconnect method
         """
         self.is_online = False
-        self.last_seen = timezone.now()
-        self.save(update_fields=["is_online", "last_seen"])
+        self.save(update_fields=["is_online"])
         agent_status_changed.send(sender=self.__class__, instance=self, is_online=False)
 
 

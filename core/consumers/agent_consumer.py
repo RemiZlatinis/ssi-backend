@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import uuid
@@ -5,6 +6,7 @@ import uuid
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.db.utils import DatabaseError
+from django.utils import timezone
 
 from core.consumers.events import (
     agent_event_type_adapter,
@@ -72,8 +74,20 @@ class AgentConsumer(AsyncWebsocketConsumer):
             logger.error(f"Error in AgentConsumer.receive: {e}", exc_info=True)
 
     async def disconnect(self, code: int) -> None:
-        if self.agent:
-            try:
-                await database_sync_to_async(self.agent.mark_disconnected)()
-            except DatabaseError:
-                pass  # Agent was deleted while connected, ignore
+        try:
+            if self.agent:
+                # Set agent.last_seen immediately
+                self.agent.last_seen = timezone.now()
+                await database_sync_to_async(self.agent.save)(
+                    update_fields=["last_seen"]
+                )
+
+                # Give 5 seconds grace period. Before refetch from database
+                await asyncio.sleep(5)
+                await database_sync_to_async(self.agent.refresh_from_db)()
+
+                # If the agent.last_seen is changed to None, agent has reconnected.
+                if self.agent.last_seen:
+                    await database_sync_to_async(self.agent.mark_disconnected)()
+        except DatabaseError:
+            logger.error("Database error while disconnecting agent", exc_info=True)
