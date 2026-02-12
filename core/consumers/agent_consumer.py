@@ -82,12 +82,20 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     update_fields=["last_seen"]
                 )
 
-                # Give 5 seconds grace period. Before refetch from database
-                await asyncio.sleep(5)
-                await database_sync_to_async(self.agent.refresh_from_db)()
+                # Wait the agent grace period. Before refetch from database
+                if self.agent.grace_period > 0:
+                    await asyncio.sleep(self.agent.grace_period)
+                    await database_sync_to_async(self.agent.refresh_from_db)()
 
-                # If the agent.last_seen is changed to None, agent has reconnected.
-                if self.agent.last_seen:
-                    await database_sync_to_async(self.agent.mark_disconnected)()
+                    # If the agent.last_seen is changed to None, agent has reconnected.
+                    if not self.agent.last_seen:
+                        logger.debug(
+                            f"Agent {self.agent.pk} reconnected within grace period, "
+                            "skipping disconnect notification"
+                        )
+                        return
+
+                # Mark as disconnected
+                await database_sync_to_async(self.agent.mark_disconnected)()
         except DatabaseError:
             logger.error("Database error while disconnecting agent", exc_info=True)

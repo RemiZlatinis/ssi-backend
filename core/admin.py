@@ -31,12 +31,18 @@ class AgentAdmin(admin.ModelAdmin):
         "registration_status",
         "is_online",
         "ip_address",
+        "grace_period",
         "created_at",
     )
     list_filter = ("registration_status", "is_online")
-    readonly_fields = ("key", "created_at", "ip_address")
+    readonly_fields = ("key", "created_at", "ip_address", "last_seen")
     search_fields = ("name", "owner__username")
     inlines = [ServiceInline]
+    fieldsets = (
+        ("General", {"fields": ("name", "owner", "key")}),
+        ("Status", {"fields": ("registration_status", "is_online", "last_seen")}),
+        ("Configuration", {"fields": ("grace_period", "ip_address")}),
+    )
 
 
 @admin.register(Service)

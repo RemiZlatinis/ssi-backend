@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import Any
 
 from django.contrib.auth import get_user_model
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -42,6 +43,12 @@ class Agent(models.Model):
         null=True,
         blank=True,
         help_text="Timestamp of when the agent was disconnected.",
+    )
+    grace_period = models.PositiveIntegerField(
+        default=30,
+        validators=[MinValueValidator(0), MaxValueValidator(300)],
+        help_text="Seconds to wait before marking agent as disconnected"
+        "(0 for immediate, max 300).",
     )
 
     class Meta:
