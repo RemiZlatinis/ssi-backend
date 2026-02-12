@@ -136,6 +136,21 @@ AI agents **must not introduce** the following:
 | Bypass permission classes           |                |                   |    ❌     |
 | Store secrets in code               |                |                   |    ❌     |
 | Disable security middleware         |                |                   |    ❌     |
+| Manually write Django migrations    |                |                   |    ❌     |
+
+**Why manual migrations are forbidden:**
+Manually creating migration files bypasses Django's migration state tracking, causing `FieldDoesNotExist` errors and breaking CI/CD pipelines. Django-generated migrations contain critical internal state updates that hand-written files lack.
+
+**Correct approach:**
+Always use Django's `makemigrations` command:
+```bash
+poetry run python -m manage makemigrations <app_name>
+```
+
+**When you need a custom migration** (data migrations, complex schema changes):
+1. First run `makemigrations` to generate the base migration
+2. Then edit the generated file to add custom operations
+3. Never create a migration file from scratch
 
 ---
 
