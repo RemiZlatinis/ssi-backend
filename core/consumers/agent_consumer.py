@@ -74,28 +74,34 @@ class AgentConsumer(AsyncWebsocketConsumer):
             logger.error(f"Error in AgentConsumer.receive: {e}", exc_info=True)
 
     async def disconnect(self, code: int) -> None:
+        """Handle agent disconnection with grace period support."""
         try:
-            if self.agent:
-                # Set agent.last_seen immediately
-                self.agent.last_seen = timezone.now()
+            if self.agent and self.agent.last_seen is None:  # is currently connected
+                self.agent.last_seen = timezone.now()  # mark disconnection time
                 await database_sync_to_async(self.agent.save)(
                     update_fields=["last_seen"]
                 )
 
-                # Wait the agent grace period. Before refetch from database
-                if self.agent.grace_period > 0:
-                    await asyncio.sleep(self.agent.grace_period)
-                    await database_sync_to_async(self.agent.refresh_from_db)()
+                # If grace period is 0, mark disconnected immediately
+                if self.agent.grace_period == 0:
+                    await database_sync_to_async(self.agent.mark_disconnected)()
+                    return
 
-                    # If the agent.last_seen is changed to None, agent has reconnected.
-                    if not self.agent.last_seen:
-                        logger.debug(
-                            f"Agent {self.agent.pk} reconnected within grace period, "
-                            "skipping disconnect notification"
-                        )
-                        return
-
-                # Mark as disconnected
-                await database_sync_to_async(self.agent.mark_disconnected)()
+                # Fire-and-forget
+                asyncio.create_task(self._grace_period_disconnect(self.agent))
         except DatabaseError:
             logger.error("Database error while disconnecting agent", exc_info=True)
+
+    async def _grace_period_disconnect(self, agent: Agent) -> None:
+        """
+        Background task to check if agent reconnected within grace period.
+        Runs independently, avoiding blocking of the main ASGI handler.
+        """
+        try:
+            await asyncio.sleep(agent.grace_period)
+            await database_sync_to_async(agent.refresh_from_db)()
+            if agent.last_seen is not None:
+                # Agent is still offline after grace period - mark as disconnected
+                await database_sync_to_async(agent.mark_disconnected)()
+        except DatabaseError:
+            logger.error("Database error during grace period disconnect", exc_info=True)

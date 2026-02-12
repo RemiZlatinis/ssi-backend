@@ -63,8 +63,7 @@ def sync_agent_services_and_set_online(
         agent_service_id__in=incoming_service_ids  # Filter deleted services
     ).delete()
 
-    if not agent.is_online:
-        agent.mark_connected()
+    agent.mark_connected()
 
 
 @database_sync_to_async

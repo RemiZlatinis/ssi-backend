@@ -61,12 +61,16 @@ class Agent(models.Model):
         """
         Sets the agent.is_online to True,
         the agent.last_seen to None,
-        and trigger the agent_status_changed signal
+        and trigger the agent_status_changed signal if the agent was previously offline.
         """
+        was_not_online = not self.is_online
         self.is_online = True
         self.last_seen = None
         self.save(update_fields=["is_online", "last_seen"])
-        agent_status_changed.send(sender=self.__class__, instance=self, is_online=True)
+        if was_not_online:
+            agent_status_changed.send(
+                sender=self.__class__, instance=self, is_online=True
+            )
 
     def mark_disconnected(self) -> None:
         """
