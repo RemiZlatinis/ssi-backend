@@ -36,12 +36,14 @@ class AgentOwnerSerializer(serializers.ModelSerializer):
 class AgentSerializer(serializers.ModelSerializer):
     """
     Serializer for the Agent model.
-    Allows updating the agent's name, but other fields are read-only.
+    Allows updating the agent's name and grace_period, but other fields are read-only.
     """
 
     # This will nest the serialized services under each agent
     services = ServiceSerializer(many=True, read_only=True)
     owner = AgentOwnerSerializer(read_only=True)
+
+    grace_period = serializers.IntegerField(min_value=0, max_value=300)
 
     class Meta:
         model = Agent
