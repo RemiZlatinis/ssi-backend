@@ -24,7 +24,6 @@ from core.consumers.events.typing import (
     ServiceStatus,
 )
 from core.models import Agent, Service
-from core.utils import get_static_icon_url
 from notifications.models import Device
 
 from .signals import agent_status_changed
@@ -40,10 +39,8 @@ async def receive_agent_status_changed(sender, instance: Agent, is_online, **kwa
     """
     if is_online:
         title = f'"{instance.name}" is online'
-        icon = "ok.png"
     else:
         title = f'"{instance.name}" went offline'
-        icon = "server.png"
 
     # Fetch devices asynchronously
     owner_devices = await sync_to_async(
@@ -57,7 +54,6 @@ async def receive_agent_status_changed(sender, instance: Agent, is_online, **kwa
         await device.send_notification(
             title=title,
             channel_id="agent-status",
-            large_icon=get_static_icon_url(icon),
         )
 
 
@@ -166,7 +162,6 @@ async def post_save_service_status(
                 status_lower = "unknown"
 
             channel_id = f"service-{status_lower}"
-            icon_name = f"{status_lower}.png"
             user_devices = await sync_to_async(
                 lambda: list(
                     Device.objects.filter(
@@ -179,7 +174,6 @@ async def post_save_service_status(
                     title=f"{instance.name} - {new_status}",
                     body=instance.last_message,
                     channel_id=channel_id,
-                    large_icon=get_static_icon_url(icon_name),
                 )
 
 

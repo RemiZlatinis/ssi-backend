@@ -19,7 +19,6 @@ async def send_push_notification(
     body: str,
     data: dict[str, Any] | None = None,
     channel_id: str | None = None,
-    large_icon: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Send a push notification to a device.
@@ -37,7 +36,6 @@ async def send_push_notification(
         body: Notification body
         data: Optional data payload
         channel_id: Optional Android channel ID
-        large_icon: Optional large icon URL for Android
 
     Returns:
         The response from the Expo push service, or None on failure
@@ -54,16 +52,8 @@ async def send_push_notification(
         "title": title,
         "body": body,
         "data": data,
+        "channelId": channel_id,
     }
-
-    # Add Android-specific fields
-    if channel_id or large_icon:
-        android_payload = payload.get("android", {})
-        if channel_id:
-            android_payload["channelId"] = channel_id
-        if large_icon:
-            android_payload["largeIcon"] = large_icon
-        payload["android"] = android_payload
 
     try:
         async with httpx.AsyncClient() as client:

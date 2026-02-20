@@ -59,7 +59,6 @@ class Device(models.Model):
         body: str = "",
         data: dict[str, Any] | None = None,
         channel_id: str | None = None,
-        large_icon: str | None = None,
         **extra: Any,
     ) -> dict[str, Any] | None:
         if self.status == self.STATUS_INACTIVE:
@@ -74,17 +73,9 @@ class Device(models.Model):
             "title": title,
             "body": body,
             "data": data,
+            "channelId": channel_id,
             **extra,
         }
-
-        # Add Android-specific fields
-        if channel_id or large_icon:
-            android_payload = payload.get("android", {})
-            if channel_id:
-                android_payload["channelId"] = channel_id
-            if large_icon:
-                android_payload["largeIcon"] = large_icon
-            payload["android"] = android_payload
 
         try:
             async with httpx.AsyncClient() as client:
