@@ -49,6 +49,22 @@ class AgentConsumer(AsyncWebsocketConsumer):
             )
             return
 
+        # Ensure only one connection per agent is active at a time
+        self.superseded = False
+        self.agent_group_name = f"agent_{self.agent.pk}"
+
+        # Broadcast to the group that a new connection is established
+        await self.channel_layer.group_send(
+            self.agent_group_name,
+            {
+                "type": "supersede.connection",
+                "new_channel_name": self.channel_name,
+            },
+        )
+
+        # Join the group to receive future supersede events
+        await self.channel_layer.group_add(self.agent_group_name, self.channel_name)
+
         # Accept the connection (We are now receiving messages from the agent)
         await self.accept()
 
@@ -73,14 +89,45 @@ class AgentConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error in AgentConsumer.receive: {e}", exc_info=True)
 
+    async def supersede_connection(self, event: dict) -> None:
+        """
+        Received when a redundant client connects for the SAME agent.
+        We close ourselves forcefully to prevent database state collision.
+        """
+        if event.get("new_channel_name") != self.channel_name:
+            self.superseded = True
+            if self.agent:
+                logger.info(
+                    f"Agent {self.agent.pk} opened a new connection. "
+                    "Closing this superseded socket."
+                )
+            await self.close(code=4000)
+
     async def disconnect(self, code: int) -> None:
         """Handle agent disconnection with grace period support."""
+        # Unsubscribe from group
+        if getattr(self, "agent_group_name", None):
+            await self.channel_layer.group_discard(
+                self.agent_group_name, self.channel_name
+            )
+
+        # Do not modify the database if we were kicked by a newer connection
+        if getattr(self, "superseded", False):
+            logger.debug(
+                f"Ignoring disconnect for superseded channel {self.channel_name}"
+            )
+            return
+
         try:
-            if self.agent and self.agent.last_seen is None:  # is currently connected
-                self.agent.last_seen = timezone.now()  # mark disconnection time
-                await database_sync_to_async(self.agent.save)(
-                    update_fields=["last_seen"]
-                )
+            if self.agent:
+                # Refresh from DB before checking last_seen
+                await database_sync_to_async(self.agent.refresh_from_db)()
+
+                if self.agent.last_seen is None:  # is currently connected
+                    self.agent.last_seen = timezone.now()  # mark disconnection time
+                    await database_sync_to_async(self.agent.save)(
+                        update_fields=["last_seen"]
+                    )
 
                 # If grace period is 0, mark disconnected immediately
                 if self.agent.grace_period == 0:
