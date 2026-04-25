@@ -18,7 +18,7 @@ async def send_push_notification(
     title: str,
     body: str,
     data: dict[str, Any] | None = None,
-    channel_id: str | None = None,
+    channel_id: str | None = "agent-status",
 ) -> dict[str, Any] | None:
     """
     Send a push notification to a device.
@@ -46,6 +46,9 @@ async def send_push_notification(
     if data is None:
         data = {}
 
+    if channel_id is None:
+        channel_id = "agent-status"
+
     # Construct the payload
     payload = {
         "to": device_token,
@@ -54,6 +57,10 @@ async def send_push_notification(
         "data": data,
         "channelId": channel_id,
     }
+
+    # Filter out None values to prevent Expo from rejecting the request with 400
+    # (e.g., channelId: null is now rejected by Expo)
+    payload = {k: v for k, v in payload.items() if v is not None}
 
     try:
         async with httpx.AsyncClient() as client:
@@ -67,7 +74,13 @@ async def send_push_notification(
                 json=[payload],
             )
             result: dict[str, Any] = response.json()
-            logger.info(f"Push notification sent to device: {result}")
+            if response.status_code == 200:
+                logger.info(f"Push notification sent to device: {result}")
+            else:
+                logger.error(
+                    f"Failed to send push notification. "
+                    f"Status: {response.status_code}, Body: {response.text}"
+                )
             return result
     except httpx.RequestError as e:
         logger.error(f"Error sending push notification: {e}")

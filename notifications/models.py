@@ -58,7 +58,7 @@ class Device(models.Model):
         title: str = "Title",
         body: str = "",
         data: dict[str, Any] | None = None,
-        channel_id: str | None = None,
+        channel_id: str | None = "agent-status",
         **extra: Any,
     ) -> dict[str, Any] | None:
         if self.status == self.STATUS_INACTIVE:
@@ -66,6 +66,9 @@ class Device(models.Model):
 
         if data is None:
             data = {}
+
+        if channel_id is None:
+            channel_id = "agent-status"
 
         # Construct the payload
         payload = {
@@ -76,6 +79,10 @@ class Device(models.Model):
             "channelId": channel_id,
             **extra,
         }
+
+        # Filter out None values to prevent Expo from rejecting the request with 400
+        # (e.g., channelId: null is now rejected by Expo)
+        payload = {k: v for k, v in payload.items() if v is not None}
 
         try:
             async with httpx.AsyncClient() as client:
@@ -89,7 +96,13 @@ class Device(models.Model):
                     json=[payload],
                 )
                 result: dict[str, Any] = response.json()
-                logger.info(f"Notification sent to device {self.pk}: {result}")
+                if response.status_code == 200:
+                    logger.info(f"Notification sent to device {self.pk}: {result}")
+                else:
+                    logger.error(
+                        f"Failed to send notification to device {self.pk}. "
+                        f"Status: {response.status_code}, Body: {response.text}"
+                    )
                 return result
         except httpx.RequestError as e:
             logger.error(f"Error sending notification to device {self.pk}: {e}")

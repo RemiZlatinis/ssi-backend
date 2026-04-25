@@ -84,11 +84,22 @@ class DeviceAdmin(admin.ModelAdmin):
                             messages.ERROR,
                         )
                 else:
-                    self.message_user(
-                        request,
-                        "No receipt data received from push service.",
-                        messages.ERROR,
-                    )
+                    errors = result.get("errors", [])
+                    if errors and isinstance(errors, list) and len(errors) > 0:
+                        error_message = errors[0].get(
+                            "message", "Unknown validation error."
+                        )
+                        self.message_user(
+                            request,
+                            f"Expo validation error: {error_message}",
+                            messages.ERROR,
+                        )
+                    else:
+                        self.message_user(
+                            request,
+                            "No receipt or error data received from push service.",
+                            messages.ERROR,
+                        )
             else:
                 self.message_user(
                     request,
