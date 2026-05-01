@@ -39,7 +39,9 @@ def update_agent_ip(agent: Agent, new_ip: str | None) -> None:
 
 @database_sync_to_async
 def sync_agent_services_and_set_online(
-    agent: Agent, services: list[AgentServiceDataModel]
+    agent: Agent,
+    services: list[AgentServiceDataModel],
+    connection_id: uuid.UUID | None = None,
 ) -> None:
     """
     Synchronize the agent's services with the given list of services and mark as online.
@@ -63,7 +65,7 @@ def sync_agent_services_and_set_online(
         agent_service_id__in=incoming_service_ids  # Filter deleted services
     ).delete()
 
-    agent.mark_connected()
+    agent.mark_connected(connection_id=connection_id)
 
 
 @database_sync_to_async

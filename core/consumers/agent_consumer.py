@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import uuid
+from datetime import datetime
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -26,6 +27,7 @@ class AgentConsumer(AsyncWebsocketConsumer):
     """
 
     agent: Agent | None = None
+    connection_id: uuid.UUID | None = None
 
     async def connect(self) -> None:
         # Get the agent key from the URL
@@ -49,8 +51,32 @@ class AgentConsumer(AsyncWebsocketConsumer):
             )
             return
 
+        # Ensure only one connection per agent is active at a time
+        self.superseded = False
+        self.agent_group_name = f"agent_{self.agent.pk}"
+
+        # Broadcast to the group that a new connection is established
+        await self.channel_layer.group_send(
+            self.agent_group_name,
+            {
+                "type": "supersede.connection",
+                "new_channel_name": self.channel_name,
+            },
+        )
+
+        # Join the group to receive future supersede events
+        await self.channel_layer.group_add(self.agent_group_name, self.channel_name)
+
         # Accept the connection (We are now receiving messages from the agent)
         await self.accept()
+
+        # Generate a unique session ID for this connection
+        self.connection_id = uuid.uuid4()
+
+        # Mark as connected immediately to clear any pending grace periods
+        await database_sync_to_async(self.agent.mark_connected)(
+            connection_id=self.connection_id
+        )
 
         # Update the agent's IP
         await update_agent_ip(agent=self.agent, new_ip=get_client_ip(self.scope))
@@ -64,23 +90,90 @@ class AgentConsumer(AsyncWebsocketConsumer):
             return
 
         try:
+            # Resurrection logic: ensure the agent is marked online in the DB.
+            # We throttle this check to once per minute to avoid DB pressure.
+            now = timezone.now()
+            last_check = getattr(self, "_last_resurrection_check", None)
+            if last_check is None or (now - last_check).total_seconds() > 60:
+                self._last_resurrection_check = now
+                await database_sync_to_async(self.agent.refresh_from_db)()
+                if (
+                    not self.agent.is_online
+                    or self.agent.connection_id != self.connection_id
+                ):
+                    logger.info(
+                        f"Resurrecting agent {self.agent.pk} (session mismatch or offline)"
+                    )
+                    await database_sync_to_async(self.agent.mark_connected)(
+                        connection_id=self.connection_id
+                    )
+
             # Parsing and validate incoming event payload dynamically
             event = agent_event_type_adapter.validate_json(text_data)
 
-            await handle_agent_event(self.agent, event)
+            await handle_agent_event(
+                self.agent, event, connection_id=self.connection_id
+            )
         except json.JSONDecodeError:
             logger.warning(f"Invalid JSON from agent {self.agent.pk}")
         except Exception as e:
             logger.error(f"Error in AgentConsumer.receive: {e}", exc_info=True)
 
+    async def supersede_connection(self, event: dict) -> None:
+        """
+        Received when a redundant client connects for the SAME agent.
+        We close ourselves forcefully to prevent database state collision.
+        """
+        if event.get("new_channel_name") != self.channel_name:
+            self.superseded = True
+            if self.agent:
+                logger.info(
+                    f"Agent {self.agent.pk} opened a new connection. "
+                    "Closing this superseded socket."
+                )
+            await self.close(code=4000)
+
     async def disconnect(self, code: int) -> None:
         """Handle agent disconnection with grace period support."""
+        # Unsubscribe from group
+        if getattr(self, "agent_group_name", None):
+            await self.channel_layer.group_discard(
+                self.agent_group_name, self.channel_name
+            )
+
+        # Do not modify the database if we were kicked by a newer connection
+        if getattr(self, "superseded", False):
+            logger.debug(
+                f"Ignoring disconnect for superseded channel {self.channel_name}"
+            )
+            return
+
         try:
-            if self.agent and self.agent.last_seen is None:  # is currently connected
-                self.agent.last_seen = timezone.now()  # mark disconnection time
-                await database_sync_to_async(self.agent.save)(
-                    update_fields=["last_seen"]
-                )
+            if self.agent:
+                # Refresh from DB before checking last_seen
+                await database_sync_to_async(self.agent.refresh_from_db)()
+
+                if self.agent.last_seen is None:  # is currently connected
+                    # Atomic update: only set last_seen if we still own the connection
+                    updated = await database_sync_to_async(
+                        Agent.objects.filter(
+                            pk=self.agent.pk, connection_id=self.connection_id
+                        ).update
+                    )(last_seen=timezone.now())
+
+                    if not updated:
+                        logger.debug(
+                            f"Agent {self.agent.pk} already reconnected."
+                            " Skipping disconnect."
+                        )
+                        return
+
+                    await database_sync_to_async(self.agent.refresh_from_db)()
+
+                # We use the timestamp to ensure ONLY the latest disconnect task
+                # can mark the agent as offline, preventing race conditions from
+                # rapid disconnect/reconnect cycles.
+                disconnection_time = self.agent.last_seen
 
                 # If grace period is 0, mark disconnected immediately
                 if self.agent.grace_period == 0:
@@ -88,11 +181,15 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     return
 
                 # Fire-and-forget
-                asyncio.create_task(self._grace_period_disconnect(self.agent))
+                asyncio.create_task(
+                    self._grace_period_disconnect(self.agent, disconnection_time)
+                )
         except DatabaseError:
             logger.error("Database error while disconnecting agent", exc_info=True)
 
-    async def _grace_period_disconnect(self, agent: Agent) -> None:
+    async def _grace_period_disconnect(
+        self, agent: Agent, expected_last_seen: datetime
+    ) -> None:
         """
         Background task to check if agent reconnected within grace period.
         Runs independently, avoiding blocking of the main ASGI handler.
@@ -100,8 +197,11 @@ class AgentConsumer(AsyncWebsocketConsumer):
         try:
             await asyncio.sleep(agent.grace_period)
             await database_sync_to_async(agent.refresh_from_db)()
-            if agent.last_seen is not None:
-                # Agent is still offline after grace period - mark as disconnected
+            if (
+                agent.last_seen == expected_last_seen
+                and agent.connection_id == self.connection_id
+            ):
+                # Agent is still offline AND it's still our specific session that died
                 await database_sync_to_async(agent.mark_disconnected)()
         except DatabaseError:
             logger.error("Database error during grace period disconnect", exc_info=True)

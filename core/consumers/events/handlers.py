@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from core.consumers.events.db import (
     add_service,
@@ -12,11 +13,15 @@ from core.models import Agent
 logger = logging.getLogger(__name__)
 
 
-async def handle_agent_event(agent: Agent, event: AgentEventType) -> None:
+async def handle_agent_event(
+    agent: Agent, event: AgentEventType, connection_id: uuid.UUID | None = None
+) -> None:
     """Dispatches agent events"""
     if event.type == "agent.ready":
         logger.debug(f"Agent {agent.pk} is ready.")
-        await sync_agent_services_and_set_online(agent, event.data.services)
+        await sync_agent_services_and_set_online(
+            agent, event.data.services, connection_id=connection_id
+        )
 
     elif event.type == "agent.service_added":
         logger.debug(f"Agent {agent.pk} added a new service. [{event.data.service.id}]")

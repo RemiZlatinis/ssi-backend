@@ -50,6 +50,11 @@ class Agent(models.Model):
         help_text="Seconds to wait before marking agent as disconnected"
         "(0 for immediate, max 300).",
     )
+    connection_id = models.UUIDField(
+        null=True,
+        blank=True,
+        help_text="Unique ID for the current active WebSocket connection.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -57,17 +62,18 @@ class Agent(models.Model):
     def __str__(self) -> str:
         return self.name
 
-    def mark_connected(self) -> None:
+    def mark_connected(self, connection_id: uuid.UUID | None = None) -> None:
         """
-        Sets the agent.is_online to True,
-        the agent.last_seen to None,
-        and trigger the agent_status_changed signal if the agent was previously offline.
+        Sets the agent.is_online to True, the agent.last_seen to None,
+        and records the unique connection_id.
+        Triggers the agent_status_changed signal if the agent was previously offline.
         """
-        was_not_online = not self.is_online
+        was_offline = not self.is_online
         self.is_online = True
         self.last_seen = None
-        self.save(update_fields=["is_online", "last_seen"])
-        if was_not_online:
+        self.connection_id = connection_id
+        self.save(update_fields=["is_online", "last_seen", "connection_id"])
+        if was_offline:
             agent_status_changed.send(
                 sender=self.__class__, instance=self, is_online=True
             )
@@ -75,12 +81,17 @@ class Agent(models.Model):
     def mark_disconnected(self) -> None:
         """
         Sets the agent.is_online to False and trigger the agent_status_changed signal
+        if the agent was previously online.
 
         Note: The agent.last_seen is set in the AgentConsumer.disconnect method
         """
+        was_online = self.is_online
         self.is_online = False
         self.save(update_fields=["is_online"])
-        agent_status_changed.send(sender=self.__class__, instance=self, is_online=False)
+        if was_online:
+            agent_status_changed.send(
+                sender=self.__class__, instance=self, is_online=False
+            )
 
 
 class Service(models.Model):
