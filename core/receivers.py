@@ -171,7 +171,7 @@ async def post_save_service_status(
             )()
             for device in user_devices:
                 await device.send_notification(
-                    title=f"{instance.name} - {new_status}",
+                    title=f"{instance.agent.name}: {instance.name} - {new_status}",
                     body=instance.last_message,
                     channel_id=channel_id,
                 )
