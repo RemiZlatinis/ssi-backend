@@ -1,10 +1,12 @@
 from typing import Any
 
 from asgiref.sync import sync_to_async
-from django.db.models.signals import post_delete, post_save, pre_save
+from channels.layers import get_channel_layer
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 
 from core.consumers.events.broadcasting import (
+    broadcast_agent_removed,
     broadcast_agent_status_update,
     broadcast_service_added,
     broadcast_service_removed,
@@ -12,6 +14,8 @@ from core.consumers.events.broadcasting import (
 )
 from core.consumers.events.mappers import map_agent_to_client_model
 from core.consumers.events.typing import (
+    ClientAgentRemovedEvent,
+    ClientAgentRemovedPayload,
     ClientServiceAddedEvent,
     ClientServiceAddedPayload,
     ClientServiceDataModel,
@@ -194,3 +198,29 @@ async def handle_service_deleted(
         )
     )
     await broadcast_service_removed(instance.agent.owner_id, event)
+
+
+@receiver(pre_delete, sender=Agent)
+async def handle_agent_deleted(
+    sender: type[Agent], instance: Agent, **kwargs: Any
+) -> None:
+    """
+    Handles 'Agent' deletion:
+    - Sends 'agent_removed' event to the agent's channel layer group.
+    - Broadcasts 'client.agent_removed' event to connected clients.
+    """
+    # 1. Notify the agent itself via WebSocket (if active)
+    channel_layer = get_channel_layer()
+    if channel_layer:
+        await channel_layer.group_send(
+            f"agent_{instance.pk}",
+            {
+                "type": "agent_removed",
+            },
+        )
+
+    # 2. Notify the clients (SSE)
+    event = ClientAgentRemovedEvent(
+        data=ClientAgentRemovedPayload(agent_id=str(instance.pk))
+    )
+    await broadcast_agent_removed(instance.owner_id, event)

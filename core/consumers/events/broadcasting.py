@@ -5,6 +5,7 @@ from channels.layers import get_channel_layer
 from core.consumers.groups import get_client_group_name
 
 from .typing import (
+    ClientAgentRemovedEvent,
     ClientServiceAddedEvent,
     ClientServiceRemovedEvent,
     ClientServiceStatusUpdateEvent,
@@ -96,6 +97,27 @@ async def broadcast_service_status_update(
         user_clients_group_name,
         {
             "type": "service_status_update",
+            "event": event.model_dump(mode="json"),
+        },
+    )
+
+
+async def broadcast_agent_removed(
+    owner_id: int, event: ClientAgentRemovedEvent
+) -> None:
+    """
+    Broadcast agent removed event to clients.
+    """
+    channel_layer = get_channel_layer()
+    if not channel_layer:
+        logger.debug("Channel layer not configured. Cannot broadcast agent removed.")
+        return
+
+    user_clients_group_name = get_client_group_name(owner_id)
+    await channel_layer.group_send(
+        user_clients_group_name,
+        {
+            "type": "agent_removed",
             "event": event.model_dump(mode="json"),
         },
     )

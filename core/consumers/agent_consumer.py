@@ -102,7 +102,8 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     or self.agent.connection_id != self.connection_id
                 ):
                     logger.info(
-                        f"Resurrecting agent {self.agent.pk} (session mismatch or offline)"
+                        f"Resurrecting agent {self.agent.pk} "
+                        "(session mismatch or offline)"
                     )
                     await database_sync_to_async(self.agent.mark_connected)(
                         connection_id=self.connection_id
@@ -132,6 +133,19 @@ class AgentConsumer(AsyncWebsocketConsumer):
                     "Closing this superseded socket."
                 )
             await self.close(code=4000)
+
+    async def agent_removed(self, event: dict) -> None:
+        """
+        Received when the agent is deleted from the backend.
+        We notify the agent and close the connection.
+        """
+        if self.agent:
+            logger.info(
+                f"Agent {self.agent.pk} has been removed. "
+                "Sending notification and closing connection."
+            )
+        await self.send(text_data=json.dumps({"type": "agent.removed"}))
+        await self.close(code=4002, reason="Agent removed")
 
     async def disconnect(self, code: int) -> None:
         """Handle agent disconnection with grace period support."""

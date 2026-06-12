@@ -92,6 +92,10 @@ class ClientServiceStatusUpdatePayload(BaseModel):
     timestamp: datetime
 
 
+class ClientAgentRemovedPayload(BaseModel):
+    agent_id: str
+
+
 # --- Event Models ---
 
 
@@ -148,10 +152,16 @@ class ClientServiceStatusUpdateEvent(BaseModel):
     data: ClientServiceStatusUpdatePayload
 
 
+class ClientAgentRemovedEvent(BaseModel):
+    type: Literal["client.agent_removed"] = "client.agent_removed"
+    data: ClientAgentRemovedPayload
+
+
 ClientEvent = (
     ClientInitialStatusEvent
     | ClientStatusUpdateEvent
     | ClientServiceAddedEvent
     | ClientServiceRemovedEvent
     | ClientServiceStatusUpdateEvent
+    | ClientAgentRemovedEvent
 )

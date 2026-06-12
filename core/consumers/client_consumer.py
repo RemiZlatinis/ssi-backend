@@ -123,6 +123,7 @@ class ClientConsumer(AsyncHttpConsumer):
     service_added = _handle_event
     service_removed = _handle_event
     service_status_update = _handle_event
+    agent_removed = _handle_event
 
     async def _send_event(self, event) -> None:
         """Send an event to the client."""
