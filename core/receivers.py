@@ -189,7 +189,7 @@ async def handle_service_deleted(
     Handles 'Service' deletion by broadcasting 'service_removed' event.
     """
     # Skip broadcasting if this service is being cascade-deleted with its agent
-    if await sync_to_async(Agent.objects.filter(id=instance.agent_id).exists)():
+    if not await sync_to_async(Agent.objects.filter(id=instance.agent_id).exists)():
         return
 
     event = ClientServiceRemovedEvent(
