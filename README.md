@@ -15,6 +15,8 @@ The **SSI Backend** is a Django-based application that serves as the central hub
 
 ## 🚀 Getting Started
 
+> **Tip:** if you're setting up the whole SSI ecosystem (agent, backend, clients) rather than just this repo, use the [workspace setup script](https://github.com/RemiZlatinis/ssi) in the metarepository instead — it automates everything below across all components.
+
 ### Prerequisites
 
 - Python 3.12+
@@ -36,29 +38,45 @@ The **SSI Backend** is a Django-based application that serves as the central hub
    poetry install
    ```
 
-3. **Set up environment**
+3. **Set up environment (Only for Production)**
 
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
+   > All the needed environment variables for development are preserved on `.env.development` including a default admin login (see below).You can **override** any environment variables them by setting them on `.env`. On production use the `.env.example` template and provide all the values.
+
 4. **Run services (Database & Redis)**
 
    ```bash
-   docker-compose up -d
+   docker compose up -d # This could `be docker-compose` or `podman-compose` or `podman compose` depending on your setup.
    ```
 
-5. **Run migrations**
+   This also starts the Django dev server itself — the `backend` service's image runs `manage.py runserver` with your working directory bind-mounted for hot reload, and publishes port 8000. There's no separate "start the server" step.
+
+5. **Run migrations and create the default admin user**
+
+   `db` and `valkey` don't publish any ports, so they're only reachable from *inside* the Compose network — run one-off Django commands via `docker compose exec`, not directly with `poetry run` on your host:
 
    ```bash
-   poetry run python manage.py migrate
+   docker compose exec backend poetry run python manage.py migrate
+   docker compose exec backend poetry run python manage.py ensure_superuser
    ```
 
-6. **Start the server**
-   ```bash
-   poetry run python manage.py runserver
-   ```
+   `ensure_superuser` reads `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` from your `.env` and creates that user if it doesn't already exist yet (safe to re-run).
+
+### Default admin login (development only)
+
+`.env.development` ships with a default admin account so you don't have to create one by hand:
+
+| Field    | Value                                       |
+| -------- | -------------------------------------------- |
+| URL      | <http://localhost:8000/admin>                 |
+| Username | `admin`                                      |
+| Password | `admin`                                      |
+
+> ⚠️ These credentials are for local development only and are **not** used in `docker-compose.prod.yml` — production deployments must set their own `DJANGO_SUPERUSER_*` values via real secrets.
 
 ## 📚 Documentation
 
