@@ -18,8 +18,8 @@ The **SSI Backend** is a Django-based application that serves as the central hub
 ### Prerequisites
 
 - Python 3.12+
-- Docker & Docker Compose (for Redis/Postgres)
 - Poetry (for dependency management)
+- Docker/Podman & Compose (for Postgres/Redis)
 
 ### Installation
 
