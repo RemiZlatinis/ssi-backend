@@ -38,14 +38,13 @@ The **SSI Backend** is a Django-based application that serves as the central hub
    poetry install
    ```
 
-3. **Set up environment (Only for Production)**
+3. **Set up the development environment**
 
    ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
+   cp -n .env.development .env
    ```
 
-   > All the needed environment variables for development are preserved on `.env.development` including a default admin login (see below).You can **override** any environment variables them by setting them on `.env`. On production use the `.env.example` template and provide all the values.
+   > `.env.development` ships with sensible local defaults, including the default admin login (see below). `.env` overrides them for your own tweaks — Compose doesn't require it, since the `db` and `backend` services read `.env.development` directly. For production you'd start from the `.env.example` template instead and fill in real values — see [Self-Hosting](./docs/self-hosting.md).
 
 4. **Run services (Database & Redis)**
 
