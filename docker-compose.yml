@@ -3,10 +3,10 @@ services:
     image: postgres:17-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_DB=${SQL_DATABASE}
-      - POSTGRES_USER=${SQL_USER}
-      - POSTGRES_PASSWORD=${SQL_PASSWORD}
+    env_file:
+      - .env.development
+      - path: ./.env
+        required: false
 
   valkey:
     image: valkey/valkey:8-alpine
@@ -20,7 +20,8 @@ services:
       - .:/app
     env_file:
       - .env.development
-      - ./.env
+      - path: ./.env
+        required: false
     depends_on:
       - db
       - valkey

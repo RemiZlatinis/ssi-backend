@@ -30,8 +30,13 @@ The easiest way to get started is by using the provided `docker-compose.yml` fil
 
    _Key variables to set:_
    - `SECRET_KEY`: A unique, long, random string.
-   - `SQL_PASSWORD`: Database password.
+   - `DATABASE_URL`: PostgreSQL connection string.
    - `CORS_ALLOWED_ORIGINS`: Origins allowed to access the API (e.g., your frontend URL).
+
+   > `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` are only needed if you run
+   > the bundled `db` service from `docker-compose.prod.yml` instead of a managed
+   > Postgres. In that case uncomment them in `.env` and keep them in sync with
+   > `DATABASE_URL`.
 
 3. **Start the Services**:
 
