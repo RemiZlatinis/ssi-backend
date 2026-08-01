@@ -7,6 +7,12 @@ services:
       - .env.development
       - path: ./.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
 
   valkey:
     image: valkey/valkey:8-alpine
@@ -23,8 +29,10 @@ services:
       - path: ./.env
         required: false
     depends_on:
-      - db
-      - valkey
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_started
 
 volumes:
   postgres_data:
