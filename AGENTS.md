@@ -75,8 +75,10 @@ Follow Django's philosophy: each piece of logic belongs in its best-fit app.
 ### Authentication
 
 - Token-based authentication for agents
-- Session authentication for admin panel
-- JWT or similar for mobile clients (via `dj-rest-auth`)
+- Session authentication for admin panel and API clients, via django-allauth in headless mode (`HEADLESS_ONLY = True`):
+  - Native mobile clients authenticate with the `X-Session-Token` header (the Django session key, stored in the device secure storage)
+  - Web clients (Expo Web) authenticate with the standard `sessionid` cookie plus CSRF token
+  - No JWTs are issued; `X-Session-Token` is a Django session key, not a JWT
 
 ### Trust Boundaries
 

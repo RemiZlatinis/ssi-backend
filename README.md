@@ -80,6 +80,7 @@ The **SSI Backend** is a Django-based application that serves as the central hub
 ## 📚 Documentation
 
 - [Self-Hosting Guide](./docs/self-hosting.md)
+- [Authentication](./docs/authentication.md)
 
 ## 🤝 Contributing
 
